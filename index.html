@@ -260,6 +260,7 @@
   .fcbar{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
   .fcstats{display:flex; gap:12px; font-size:12.5px; color:var(--ink-2); flex-wrap:wrap;}
   .fcstats b{font-family:var(--mono); color:var(--ink);}
+  .fctheme{flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--ink); line-height:1.35;}
   .fcstats .g b{color:var(--good);} .fcstats .r b{color:var(--bad);}
   .stage{position:relative; perspective:1400px; width:100%; max-width:600px; margin:0 auto; touch-action:pan-y;}
   .stack{position:absolute; inset:10px 14px -8px; border-radius:16px; background:var(--surface-2); border:1px solid var(--line-2); z-index:0;}
@@ -1039,27 +1040,29 @@ function renderDone(t){
 function fc(course){
   if(!FC[course]){
     const deck = FLASHCARDS[course]||[];
-    FC[course] = {keys:new Set(deck.map(c=>String(c.session))), onlyAgain:false, shuffle:true, run:null};
+    FC[course] = {theme:null, onlyAgain:false, shuffle:true, run:null};
   }
   return FC[course];
 }
 function fcBuild(course){
   const st = fc(course), deck = FLASHCARDS[course]||[];
-  let pool = deck.filter(c=>st.keys.has(String(c.session)) && (!st.onlyAgain || fcStatus[c.id]==='again'));
+  let pool = deck.filter(c=>(st.theme==='*' || String(c.session)===st.theme) && (!st.onlyAgain || fcStatus[c.id]==='again'));
   if(st.shuffle) pool = shuffleArr(pool.slice());
   st.run = {queue: pool.map(c=>c.id), pos:0, flipped:false, res:{}, requeued:{}};
 }
 function renderFlashcards(t){
   const course = activeCourse, deck = FLASHCARDS[course]||[];
   if(!deck.length){ t.innerHTML='<div class="empty">Pas encore de flashcards pour ce cours.</div>'; return; }
-  const st = fc(course); if(!st.run) fcBuild(course);
+  const st = fc(course);
+  if(st.theme===null) return renderFcThemes(t, course, deck);
+  if(!st.run) fcBuild(course);
   const r = st.run, byId = new Map(deck.map(c=>[c.id,c]));
-  const known = deck.filter(c=>fcStatus[c.id]==='known').length, again = deck.filter(c=>fcStatus[c.id]==='again').length;
-  const keys = [...new Set(deck.map(c=>String(c.session)))];
-  let h = '<div class="fcbar"><div class="fcstats"><span class="g">Acquises <b>'+known+'</b></span><span class="r">A revoir <b>'+again+'</b></span><span>Jamais vues <b>'+(deck.length-known-again)+'</b></span></div>'
+  const cards = st.theme==='*' ? deck : deck.filter(c=>String(c.session)===st.theme);
+  const known = cards.filter(c=>fcStatus[c.id]==='known').length, again = cards.filter(c=>fcStatus[c.id]==='again').length;
+  const title = st.theme==='*' ? 'Tous les themes' : fcThemeTitle(course, st.theme);
+  let h = '<div class="fcbar"><button class="btn ghost" id="fBack">&larr; Themes</button><span class="fctheme">'+esc(title)+'</span></div>';
+  h += '<div class="fcbar"><div class="fcstats"><span class="g">Acquises <b>'+known+'</b></span><span class="r">A revoir <b>'+again+'</b></span><span>Jamais vues <b>'+(cards.length-known-again)+'</b></span></div>'
     + '<div class="pills"><button class="pill mini '+(st.shuffle?'active':'')+'" id="fShuf">melanger</button><button class="pill mini '+(st.onlyAgain?'active':'')+'" id="fAgain">seulement a revoir</button></div></div>';
-  h += '<details'+(st.open?' open':'')+' id="fDet"><summary style="cursor:pointer;font-size:13px;color:var(--ink-2)">Sessions ('+st.keys.size+'/'+keys.length+')</summary><div class="pills" style="margin-top:8px">'
-    + keys.map(k=>'<button class="pill mini fk '+(st.keys.has(k)?'active':'')+'" data-k="'+esc(k)+'">'+esc(sessionLabel(course,k))+'</button>').join('') + '</div></details>';
   if(r.pos >= r.queue.length){
     const g = Object.values(r.res).filter(v=>v==='g').length, b = Object.values(r.res).filter(v=>v==='r').length;
     h += r.queue.length ? '<div class="fcdone"><span class="eyebrow">Tour termine</span><div class="big">'+g+' acquises · '+b+' a revoir</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+(again?'<button class="btn primary" id="fRedoAgain">Revoir les '+again+' a revoir</button>':'')+'<button class="btn" id="fNew">Nouveau tour</button></div></div>'
@@ -1088,6 +1091,25 @@ function renderFlashcards(t){
   t.querySelector('#fGood').onclick=()=>fcRate(course,'known');
   bindSwipe(t.querySelector('#stage'), flip, course);
 }
+function fcThemeTitle(course, key){
+  const row = sessionsOf(course).find(s=>String(s.n)===String(key));
+  return 'S'+key+(row ? ' · '+row.topic.split(' (')[0] : '');
+}
+function renderFcThemes(t, course, deck){
+  const st = fc(course), keys = [...new Set(deck.map(c=>String(c.session)))];
+  const count = cs=>({n:cs.length, g:cs.filter(c=>fcStatus[c.id]==='known').length, r:cs.filter(c=>fcStatus[c.id]==='again').length});
+  const all = count(deck);
+  let h = '<div class="fcbar"><div class="fcstats"><span class="g">Acquises <b>'+all.g+'</b></span><span class="r">A revoir <b>'+all.r+'</b></span><span>Jamais vues <b>'+(all.n-all.g-all.r)+'</b></span></div>'
+    + '<button class="btn" data-theme="*">Tout reviser ('+all.n+')</button></div>';
+  h += '<div class="slist">' + keys.map(k=>{
+    const row = sessionsOf(course).find(s=>String(s.n)===k), c = count(deck.filter(x=>String(x.session)===k));
+    const sub = '<span>'+c.n+' cartes</span>'+(c.g?'<span class="chip ok">'+c.g+' acquises</span>':'')+(c.r?'<span class="chip ko">'+c.r+' a revoir</span>':'');
+    return '<div class="srow"><span class="n">'+esc(k)+'</span><div class="t">'+esc(row ? row.topic.split(' (')[0] : 'Session '+k)+'<div class="sub">'+sub+'</div></div>'
+      + '<div class="acts"><button class="btn primary" data-theme="'+esc(k)+'">Reviser</button></div></div>';
+  }).join('') + '</div>';
+  t.innerHTML = h;
+  t.querySelectorAll('[data-theme]').forEach(x=>x.onclick=()=>{ st.theme = x.dataset.theme; st.onlyAgain = false; fcBuild(course); renderFlashcards(t); });
+}
 function sizeFlip(flip){
   const faces = flip.querySelectorAll('.face'); let h = 260;
   faces.forEach(f=>{ f.style.position='relative'; h=Math.max(h, f.scrollHeight); f.style.position=''; });
@@ -1097,8 +1119,7 @@ function bindFcTop(t, course){
   const st = fc(course);
   t.querySelector('#fShuf').onclick=()=>{ st.shuffle=!st.shuffle; fcBuild(course); renderFlashcards(t); };
   t.querySelector('#fAgain').onclick=()=>{ st.onlyAgain=!st.onlyAgain; fcBuild(course); renderFlashcards(t); };
-  const det = t.querySelector('#fDet'); det.ontoggle=()=>{ st.open = det.open; };
-  t.querySelectorAll('.fk').forEach(x=>x.onclick=()=>{ const k=x.dataset.k; st.keys.has(k)?st.keys.delete(k):st.keys.add(k); fcBuild(course); renderFlashcards(t); });
+  t.querySelector('#fBack').onclick=()=>{ st.theme=null; st.run=null; st.onlyAgain=false; renderFlashcards(t); };
 }
 function fcFlip(course){ const r = fc(course).run; r.flipped=!r.flipped; const f=document.getElementById('flip'); if(f) f.classList.toggle('flipped', r.flipped); }
 let fcBusy = false;
