@@ -1250,7 +1250,7 @@ initDb();
   inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; try{ C40_STANDALONE.importJson(await f.text()); location.reload(); }catch(e){ toast('Import impossible, '+e.message); } };
   const net=()=>{ document.getElementById('netState').textContent = navigator.onLine ? 'en ligne' : 'hors connexion, tout reste dispo'; };
   addEventListener('online',net); addEventListener('offline',net); net();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});var _c40rl=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(_c40rl)return;_c40rl=true;location.reload();});}
 })();
 </script>
 </body>
