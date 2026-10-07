@@ -1,7 +1,7 @@
 /* Classe 40 - service worker (VF)
    Mise a jour : incrementer CACHE (ex. c40-v2-2) a chaque changement de index.html / app.js / data.js.
    La page se recharge toute seule via l'ecouteur controllerchange dans app.js. */
-const CACHE = 'c40-v2-1';
+const CACHE = 'c40-v2-2';
 const CORE = [
   './',
   'index.html',
