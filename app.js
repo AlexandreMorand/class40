@@ -8,9 +8,9 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ ret
 
 /* ---------- COURSES / SESSIONS ---------- */
 var COURSES = [
-  {id:'cr', code:'CR', name:'Competitive Reasoning', sub:'Raisonnement competitif'},
+  {id:'cr', code:'CR', name:'Corporate Reporting', sub:'Module 1 - Corporate Financial Reporting'},
   {id:'da', code:'DA', name:'Data Analysis', sub:'Analyse de donnees'},
-  {id:'fm', code:'FM', name:'Financial Management', sub:'Gestion financiere'},
+  {id:'fm', code:'FM', name:'Financial Management and Financial Markets', sub:'Gestion financiere et marches financiers'},
   {id:'cg', code:'CG', name:'Corporate Governance', sub:'Gouvernance'}
 ];
 function courseOf(id){ for(var i=0;i<COURSES.length;i++) if(COURSES[i].id===id) return COURSES[i]; return COURSES[0]; }
