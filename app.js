@@ -251,7 +251,7 @@ function chapterRows(cid, limit){
       + '<span class="num">'+s.n+'</span>'
       + '<div class="tx"><b>'+esc(s.title)+'</b><span>'+label+' &middot; '+meta+'</span><div class="bar"><i class="'+(p.pct===100?'full':'')+'" data-w="'+p.pct+'"></i></div></div>'
       + '<span class="pct">'+p.pct+'%</span>'
-      + '<button class="go" data-go="#/q/'+cid+'/'+s.key+'">'+(p.pct===100?'Revoir':'Reprendre')+'</button>'
+      + '<button class="go" data-go="#/q/'+cid+'/'+s.key+'">'+(p.done===0?'Commencer':(p.pct===100?'Revoir':'Reprendre'))+'</button>'
       + '</div>';
   });
   if(limit) rows = rows.slice(0, limit);
