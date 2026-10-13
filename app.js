@@ -321,13 +321,14 @@ function vSession(cid, n){
   if(!s) return '<p>Session introuvable.</p>';
   var p = sessionProgress(cid, s.key);
   var fu = ficheUrl(cid, s.key);
+  if(cid==='fm' && String(s.key)==='4-5') fu='fiches/fm45-reader.html?v=20261013';
   var nbCards = cards(cid, n).length;
   var seen = store.fiches[cid+'-'+n];
   return '<button class="back" data-go="#/c/'+cid+'">&larr; '+esc(c.name)+'</button>'
   + '<div class="sess-head"><span class="num">'+s.n+'</span><div><div class="page-h">Session '+s.n+(s.part?' &middot; Partie '+s.part:'')+'</div><div class="page-sub">'+esc(s.title)+'</div></div></div>'
   + '<div class="tiles">'
   + (fu
-    ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir le PDF &rarr;</span></a>'
+    ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
   + '<div class="tile" data-go="#/q/'+cid+'/'+s.key+'"><span class="ic">'+IC.qcm+'</span><b>QCM</b><span>'+p.done+'/'+p.total+' questions &middot; '+p.acc+'% reussite</span><div class="bar"><i class="'+(p.pct===100?'full':'')+'" data-w="'+p.pct+'"></i></div><span class="arrow">'+(p.done?'Continuer':'Commencer')+' &rarr;</span></div>'
   + '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>'
