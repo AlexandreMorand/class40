@@ -27,16 +27,25 @@ function sessionsOf(cid){
   return out;
 }
 function sessionKey(cid){ return cid; }
+function contentSessionKey(cid, item){
+  var key=String(item.session);
+  if(cid==='fm' && item.part==='II' && key.indexOf('II-')!==0) return 'II-'+key;
+  return key;
+}
+function matchesSession(cid, item, n){
+  var wanted=String(n), actual=contentSessionKey(cid,item);
+  return actual===wanted || actual.indexOf(wanted+'-')===0;
+}
 function bank(cid, n){
-  var all = D.QCM[cid]||[], key = String(n).replace(/^II-/,'');
-  var b = all.filter(function(q){ var s=String(q.session); return s===key || s.indexOf(key+'-')===0; });
-  return b;
+  return (D.QCM[cid]||[]).filter(function(q){ return matchesSession(cid,q,n); });
 }
 function cards(cid, n){
-  var all = D.FLASHCARDS[cid]||[], key = String(n).replace(/^II-/,'');
+  var all=D.FLASHCARDS[cid]||[];
   if(n==null) return all;
-  return all.filter(function(q){ var s=String(q.session); return s===key || s.indexOf(key+'-')===0; });
+  return all.filter(function(q){ return matchesSession(cid,q,n); });
 }
+function progressKey(cid,session,id){ return cid+'|'+String(session)+'|'+String(id); }
+function questionProgressKey(cid,q){ return progressKey(cid,contentSessionKey(cid,q),q.id); }
 function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; return f ? f[k] : null; }
 
 /* ---------- STORE + MIGRATION ---------- */
@@ -85,24 +94,24 @@ function addAttempt(rec){ store.attempts.push(rec); save(); }
 /* ---------- PROGRESS ---------- */
 function bestByQuestion(){
   var m = {};
-  store.attempts.forEach(function(a){ if(!m[a.questionId]) m[a.questionId]={correct:a.correct, n:0}; m[a.questionId].n++; if(a.correct) m[a.questionId].correct=true; });
+  store.attempts.forEach(function(a){ var key=progressKey(a.course,a.session,a.questionId); if(!m[key]) m[key]={correct:a.correct, n:0}; m[key].n++; if(a.correct) m[key].correct=true; });
   return m;
 }
 function sessionProgress(cid, n){
   var b = bank(cid,n); if(!b.length) return {done:0,total:0,pct:0,acc:0};
   var m = bestByQuestion(), done=0, corr=0;
-  b.forEach(function(q){ if(m[q.id]){ done++; if(m[q.id].correct) corr++; } });
+  b.forEach(function(q){ var key=questionProgressKey(cid,q); if(m[key]){ done++; if(m[key].correct) corr++; } });
   return {done:done, total:b.length, pct:Math.round(done/b.length*100), acc:done?Math.round(corr/done*100):0};
 }
 function courseProgress(cid){
   var all = D.QCM[cid]||[]; if(!all.length) return {pct:0, done:0, total:0};
   var m = bestByQuestion(), done=0;
-  all.forEach(function(q){ if(m[q.id]) done++; });
+  all.forEach(function(q){ if(m[questionProgressKey(cid,q)]) done++; });
   return {pct:Math.round(done/all.length*100), done:done, total:all.length};
 }
 function globalProgress(){
   var tot=0, done=0; var m = bestByQuestion();
-  COURSES.forEach(function(c){ (D.QCM[c.id]||[]).forEach(function(q){ tot++; if(m[q.id]) done++; }); });
+  COURSES.forEach(function(c){ (D.QCM[c.id]||[]).forEach(function(q){ tot++; if(m[questionProgressKey(c.id,q)]) done++; }); });
   return {pct: tot?Math.round(done/tot*100):0, done:done, total:tot};
 }
 function accuracy(){
@@ -382,7 +391,7 @@ function answerQuiz(i){
   quiz.answered[q.id] = {choice:i, correct:correct};
   if(correct) quiz.ok++;
   var secs = Math.round((Date.now()-quiz.t0)/1000); quiz.t0 = Date.now();
-  addAttempt({course:quiz.cid, session:String(q.session), questionId:String(q.id), topic:q.topic||'', correct:correct, ts:Date.now(), source:quiz.src==='dataset'?'dataset':(quiz.n==null||quiz.n==='all'?'blanc':'session'), secs:secs});
+  addAttempt({course:quiz.cid, session:contentSessionKey(quiz.cid,q), questionId:String(q.id), topic:q.topic||'', correct:correct, ts:Date.now(), source:quiz.src==='dataset'?'dataset':(quiz.n==null||quiz.n==='all'?'blanc':'session'), secs:secs});
   render();
 }
 
