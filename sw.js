@@ -1,5 +1,5 @@
-const CACHE='c40-fm45-rebuilt-20261013';
-const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+const CACHE='c40-fm45-teaching-20261013';
+const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 // One missing optional PDF must never prevent a new application from installing.
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
@@ -38,10 +38,11 @@ self.addEventListener('fetch',e=>{
         const r=await fetch(new Request(req,{cache:'no-store'}));
         if(!r.ok) throw new Error('Network response '+r.status);
         const cache=await caches.open(CACHE);
-        await cache.put(req.mode==='navigate'?'index.html':req,r.clone());
+        await cache.put(req,r.clone());
+        if(req.mode==='navigate' && (url.pathname.endsWith('/class40/') || url.pathname.endsWith('/index.html'))) await cache.put('index.html',r.clone());
         return r;
       } catch(error) {
-        const hit=await caches.match(req.mode==='navigate'?'index.html':req);
+        const hit=await caches.match(req) || await caches.match(url.pathname) || ((url.pathname.endsWith('/class40/') || url.pathname.endsWith('/index.html')) ? await caches.match('index.html') : null);
         if(hit) return hit;
         throw error;
       }

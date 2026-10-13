@@ -321,7 +321,7 @@ function vSession(cid, n){
   if(!s) return '<p>Session introuvable.</p>';
   var p = sessionProgress(cid, s.key);
   var fu = ficheUrl(cid, s.key);
-  if(cid==='fm' && String(s.key)==='4-5') fu='fiches/fm45-reader.html?v=20261013';
+  if(cid==='fm' && String(s.key)==='4-5') fu='fiches/fm45-reader.html?v=20261013-teaching';
   var nbCards = cards(cid, n).length;
   var seen = store.fiches[cid+'-'+n];
   return '<button class="back" data-go="#/c/'+cid+'">&larr; '+esc(c.name)+'</button>'
