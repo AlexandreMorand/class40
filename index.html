@@ -180,8 +180,16 @@ footer{margin-top:26px;text-align:center;color:var(--muted);font-size:11px}
 </head>
 <body>
 <div id="c40root"></div>
+<script>
+// Use the current script URL online, and the pre-cached unversioned script offline.
+window.addEventListener('error', function(e){
+  if(e.target && e.target.tagName==='SCRIPT' && /app\.js\?/.test(e.target.src)){
+    var fallback=document.createElement('script'); fallback.src='app.js'; document.body.appendChild(fallback);
+  }
+}, true);
+</script>
 <script src="data.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=fm-parts-20261013"></script>
 </body>
 </html>
 <style>
