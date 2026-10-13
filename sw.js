@@ -48,8 +48,8 @@ self.addEventListener('fetch',e=>{
     })());
     return;
   }
-  e.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(r=>{
-    if(r.ok||r.type==='opaque'){const cp=r.clone();e.waitUntil(caches.open(CACHE).then(c=>c.put(req,cp)));}
+  e.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(async r=>{
+    if(r.ok||r.type==='opaque'){const cp=r.clone();const cache=await caches.open(CACHE); await cache.put(req,cp);}
     return r;
   })));
 });
