@@ -4,7 +4,7 @@
 </style></head><body><header><a href="../#/s/fm/4-5">← Session 4-5</a><b>FM 4-5 · Fiche de révision</b><button id="smaller" aria-label="Réduire la largeur">−</button><button id="larger" aria-label="Augmenter la largeur">+</button><a href="fm-4-5.pdf?v=20261013-teaching" download="FM 4-5 - Fiche.pdf">Télécharger le PDF</a></header><main id="reader"><div id="status" role="status">Chargement de la fiche…</div></main><script src="../vendor/pdf.min.js"></script><script>
 (async function(){
  const root=document.getElementById('reader'),status=document.getElementById('status');let width=1050,zoom=1;
- const fit=()=>{if(window.innerWidth<=600){root.style.width=(window.innerWidth*zoom)+'px';root.style.maxWidth='none';}else{root.style.width='';root.style.maxWidth=width+'px';}};
+ const fit=()=>{if(document.documentElement.clientWidth<=600){root.style.width=(document.documentElement.clientWidth*zoom)+'px';root.style.maxWidth='none';}else{root.style.width='';root.style.maxWidth=width+'px';}};
  document.getElementById('smaller').onclick=()=>{width=Math.max(550,width-150);zoom=Math.max(1,zoom-.5);fit()};
  document.getElementById('larger').onclick=()=>{width=Math.min(1600,width+150);zoom=Math.min(4,zoom+.5);fit()};
  try{
