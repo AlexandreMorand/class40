@@ -1,4 +1,4 @@
-const CACHE='c40-update-safe-20261013';
+const CACHE='c40-fm45-rebuilt-20261013';
 const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 // One missing optional PDF must never prevent a new application from installing.
 self.addEventListener('install',e=>{
