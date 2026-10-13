@@ -1,14 +1,55 @@
-const CACHE='c40-fm-parts-20261013';
-const PRECACHE=["./","index.html","manifest.webmanifest","vendor/pdf.min.js","vendor/pdf.worker.min.js","icons/icon-192.png","icons/icon-512.png","icons/icon-180.png","fiches/cr-1.pdf","fiches/cr-2.pdf","fiches/cr-3.pdf","fiches/cr-4.pdf","fiches/cr-5.pdf","fiches/cr-6.pdf","fiches/cr-7.pdf","fiches/cr-8.pdf","fiches/cr-9.pdf","fiches/cr-10.pdf","fiches/cr-11.pdf","fiches/cr-12.pdf","fiches/cr-13.pdf","fiches/cr-14.pdf","fiches/cr-16.pdf","fiches/cr-17.pdf","fiches/cr-18.pdf","fiches/cr-19.pdf","fiches/cr-20.pdf","fiches/cr-21.pdf","fiches/cr-22.pdf","fiches/cr-23.pdf","fiches/cr-24.pdf","fiches/cr-25.pdf","fiches/cr-26.pdf","fiches/cr-27.pdf","fiches/cr-28.pdf","fiches/cr-29.pdf","fiches/cr-30.pdf","fiches/cr-31.pdf","fiches/da-1.pdf","fiches/da-2.pdf","fiches/da-3.pdf","fiches/da-4.pdf","fiches/da-5.pdf","fiches/da-6.pdf","fiches/da-7.pdf","fiches/da-8.pdf","fiches/da-exam-prep.pdf","fiches/fm-1.pdf","fiches/fm-2.pdf","fiches/fm-3.pdf","fiches/fm-6.pdf","fiches/fm-4-5.pdf","fiches/cg-1.pdf","fiches/cg-2.pdf","fiches/cg-3.pdf","fiches/cg-9.pdf","fiches/cg-4-7.pdf","fiches/da-9.pdf","fiches/da-10.pdf","fiches/da-11.pdf","fiches/da-12.pdf","fiches/cg-10.pdf","fiches/fm-7.pdf","fiches/fm-8.pdf","fiches/fm-9.pdf"];
-self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE)).then(()=>self.skipWaiting())); });
-self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
+const CACHE='c40-update-safe-20261013';
+const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+// One missing optional PDF must never prevent a new application from installing.
+self.addEventListener('install',e=>{
+  e.waitUntil(caches.open(CACHE).then(async c=>{
+    await Promise.all(CORE.map(async path=>{
+      const response=await fetch(new Request(path,{cache:'reload'}));
+      if(!response.ok) throw new Error('Core cache failed: '+path);
+      await c.put(path,response);
+    }));
+    await self.skipWaiting();
+  }));
+});
+self.addEventListener('activate',e=>{
+  e.waitUntil((async()=>{
+    const cache=await caches.open(CACHE);
+    const keys=await caches.keys();
+    const oldKeys=keys.filter(k=>k.startsWith('c40-')&&k!==CACHE);
+    // Preserve previously downloaded PDFs and images without delaying updates on network downloads.
+    for(const key of oldKeys){
+      const old=await caches.open(key);
+      for(const req of await old.keys()){
+        const path=new URL(req.url).pathname;
+        if(/\.(pdf|png|jpg|jpeg|svg)$/.test(path)&&!(await cache.match(req))) await cache.put(req,await old.match(req));
+      }
+      await caches.delete(key);
+    }
+    await self.clients.claim();
+  })());
+});
 self.addEventListener('fetch',e=>{
   const req=e.request; if(req.method!=='GET') return;
   const url=new URL(req.url);
-  if(url.origin===location.origin && (req.mode==='navigate' || url.pathname.endsWith('index.html'))){
-    // network first for the page so updates arrive, cache fallback offline
-    e.respondWith(fetch(req).then(r=>{ const cp=r.clone(); caches.open(CACHE).then(c=>c.put('index.html',cp)); return r; }).catch(()=>caches.match('index.html')));
+  const fresh=url.origin===location.origin && (req.mode==='navigate'||/\/(index\.html|app\.js|data\.js)$/.test(url.pathname));
+  if(fresh){
+    e.respondWith((async()=>{
+      try {
+        const r=await fetch(new Request(req,{cache:'no-store'}));
+        if(!r.ok) throw new Error('Network response '+r.status);
+        const cache=await caches.open(CACHE);
+        await cache.put(req.mode==='navigate'?'index.html':req,r.clone());
+        return r;
+      } catch(error) {
+        const hit=await caches.match(req.mode==='navigate'?'index.html':req);
+        if(hit) return hit;
+        throw error;
+      }
+    })());
     return;
   }
-  e.respondWith(caches.match(req).then(hit=>hit || fetch(req).then(r=>{ if(r.ok || r.type==='opaque'){ const cp=r.clone(); caches.open(CACHE).then(c=>c.put(req,cp)); } return r; })));
+  e.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(r=>{
+    if(r.ok||r.type==='opaque'){const cp=r.clone();e.waitUntil(caches.open(CACHE).then(c=>c.put(req,cp)));}
+    return r;
+  })));
 });
