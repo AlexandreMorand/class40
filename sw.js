@@ -1,4 +1,4 @@
-const CACHE='c40-fm45-teaching-20261013';
+const CACHE='c40-exam-scope-20261014';
 const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 // One missing optional PDF must never prevent a new application from installing.
 self.addEventListener('install',e=>{
