@@ -1,6 +1,5 @@
-const CACHE='c40-exam-scope-20261014';
+const CACHE='c40-pdf-hotfix-20261014';
 const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
-// One missing optional PDF must never prevent a new application from installing.
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
     await Promise.all(CORE.map(async path=>{
@@ -13,36 +12,33 @@ self.addEventListener('install',e=>{
 });
 self.addEventListener('activate',e=>{
   e.waitUntil((async()=>{
-    const cache=await caches.open(CACHE);
+    // Purge every previous cache outright. Earlier versions migrated old PDF
+    // entries forward, which kept stale or broken fiche responses alive forever.
     const keys=await caches.keys();
-    const oldKeys=keys.filter(k=>k.startsWith('c40-')&&k!==CACHE);
-    // Preserve previously downloaded PDFs and images without delaying updates on network downloads.
-    for(const key of oldKeys){
-      const old=await caches.open(key);
-      for(const req of await old.keys()){
-        const path=new URL(req.url).pathname;
-        if(/\.(pdf|png|jpg|jpeg|svg)$/.test(path)&&!(await cache.match(req))) await cache.put(req,await old.match(req));
-      }
-      await caches.delete(key);
-    }
+    await Promise.all(keys.filter(k=>k.startsWith('c40-')&&k!==CACHE).map(k=>caches.delete(k)));
     await self.clients.claim();
   })());
 });
 self.addEventListener('fetch',e=>{
   const req=e.request; if(req.method!=='GET') return;
   const url=new URL(req.url);
-  const fresh=url.origin===location.origin && (req.mode==='navigate'||/\/(index\.html|app\.js|data\.js)$/.test(url.pathname));
+  if(url.origin!==location.origin) return;
+  // PDFs always come straight from the network. The service worker never caches
+  // them: a cached fiche can silently go stale and the PDF viewer issues range
+  // requests that must not be answered from a cache.
+  if(/\.pdf$/i.test(url.pathname)) return;
+  const fresh=req.mode==='navigate'||/\/(index\.html|app\.js|data\.js|sw\.js)$/.test(url.pathname);
   if(fresh){
     e.respondWith((async()=>{
       try {
         const r=await fetch(new Request(req,{cache:'no-store'}));
         if(!r.ok) throw new Error('Network response '+r.status);
         const cache=await caches.open(CACHE);
-        await cache.put(req,r.clone());
-        if(req.mode==='navigate' && (url.pathname.endsWith('/class40/') || url.pathname.endsWith('/index.html'))) await cache.put('index.html',r.clone());
+        if(url.pathname.endsWith('/class40/')||url.pathname.endsWith('/index.html')) await cache.put('index.html',r.clone());
+        else await cache.put(req,r.clone());
         return r;
       } catch(error) {
-        const hit=await caches.match(req) || await caches.match(url.pathname) || ((url.pathname.endsWith('/class40/') || url.pathname.endsWith('/index.html')) ? await caches.match('index.html') : null);
+        const hit=(url.pathname.endsWith('/class40/')||url.pathname.endsWith('/index.html')) ? await caches.match('index.html') : await caches.match(req);
         if(hit) return hit;
         throw error;
       }
@@ -50,7 +46,7 @@ self.addEventListener('fetch',e=>{
     return;
   }
   e.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(async r=>{
-    if(r.ok||r.type==='opaque'){const cp=r.clone();const cache=await caches.open(CACHE); await cache.put(req,cp);}
+    if(r.ok){const cp=r.clone();const cache=await caches.open(CACHE); await cache.put(req,cp);}
     return r;
   })));
 });

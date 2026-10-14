@@ -46,7 +46,7 @@ function cards(cid, n){
 }
 function progressKey(cid,session,id){ return cid+'|'+String(session)+'|'+String(id); }
 function questionProgressKey(cid,q){ return progressKey(cid,contentSessionKey(cid,q),q.id); }
-function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; return f ? f[k] : null; }
+function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261014-fix'; }
 
 /* ---------- STORE + MIGRATION ---------- */
 var KEY='c40.v2', OLDKEY='c40.db.v1';
@@ -321,7 +321,7 @@ function vSession(cid, n){
   if(!s) return '<p>Session introuvable.</p>';
   var p = sessionProgress(cid, s.key);
   var fu = ficheUrl(cid, s.key);
-  if(cid==='fm' && String(s.key)==='4-5') fu='fiches/fm45-reader.html?v=20261013-teaching';
+  if(cid==='fm' && String(s.key)==='4-5') fu='fiches/fm45-reader.html?v=20261014-fix';
   var nbCards = cards(cid, n).length;
   var seen = store.fiches[cid+'-'+n];
   return '<button class="back" data-go="#/c/'+cid+'">&larr; '+esc(c.name)+'</button>'

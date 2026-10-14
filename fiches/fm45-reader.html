@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>FM 4-5 - Fiche de révision</title><style>
 *{box-sizing:border-box}body{margin:0;background:#eef0f6;color:#192540;font:15px/1.5 system-ui,sans-serif}header{position:sticky;top:0;z-index:2;background:white;border-bottom:1px solid #dae0eb;padding:12px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}header b{flex:1}a{color:#244c94;text-decoration:none}a:hover{text-decoration:underline}main{max-width:1050px;margin:auto;padding:22px 16px}.page{margin:0 auto 24px;background:white;box-shadow:0 2px 14px #1a254021;width:100%;position:relative}.page canvas{display:block;width:100%;height:auto}.label{font-size:12px;color:#58647a;text-align:center;margin:0 0 5px}#status{text-align:center;padding:12px}button{border:1px solid #bcc9dc;border-radius:5px;background:white;color:#192540;padding:5px 10px;cursor:pointer}button:disabled{opacity:.45}@media(max-width:600px){header{padding:10px 12px;gap:10px;font-size:13px}main{padding:12px 6px}.page{margin-bottom:16px}}
-</style></head><body><header><a href="../#/s/fm/4-5">← Session 4-5</a><b>FM 4-5 · Fiche de révision</b><button id="smaller" aria-label="Réduire la largeur">−</button><button id="larger" aria-label="Augmenter la largeur">+</button><a href="fm-4-5.pdf?v=20261014-scope" download="FM 4-5 - Fiche.pdf">Télécharger le PDF</a></header><main id="reader"><div id="status" role="status">Chargement de la fiche…</div></main><script src="../vendor/pdf.min.js"></script><script>
+</style></head><body><header><a href="../#/s/fm/4-5">← Session 4-5</a><b>FM 4-5 · Fiche de révision</b><button id="smaller" aria-label="Réduire la largeur">−</button><button id="larger" aria-label="Augmenter la largeur">+</button><a href="fm-4-5.pdf?v=20261014-fix" download="FM 4-5 - Fiche.pdf">Télécharger le PDF</a></header><main id="reader"><div id="status" role="status">Chargement de la fiche…</div></main><script src="../vendor/pdf.min.js"></script><script>
 (async function(){
  const root=document.getElementById('reader'),status=document.getElementById('status');let width=1050,zoom=1;
  const fit=()=>{if(document.documentElement.clientWidth<=600){root.style.width=(document.documentElement.clientWidth*zoom)+'px';root.style.maxWidth='none';}else{root.style.width='';root.style.maxWidth=width+'px';}};
@@ -9,7 +9,7 @@
  document.getElementById('larger').onclick=()=>{width=Math.min(1600,width+150);zoom=Math.min(4,zoom+.5);fit()};
  try{
   pdfjsLib.GlobalWorkerOptions.workerSrc='../vendor/pdf.worker.min.js';
-  const pdf=await pdfjsLib.getDocument('fm-4-5.pdf?v=20261014-scope').promise;
+  const pdf=await pdfjsLib.getDocument('fm-4-5.pdf?v=20261014-fix').promise;
   for(let n=1;n<=pdf.numPages;n++){
    const page=await pdf.getPage(n),view=page.getViewport({scale:2});
    const label=document.createElement('div');label.className='label';label.textContent='Page '+n+' / '+pdf.numPages;
