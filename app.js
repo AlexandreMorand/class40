@@ -179,10 +179,119 @@ function parseHash(){
   if(p[0]==='f'&&p[1]) return {page:'flash', course:p[1], n:p[2]||null};
   if(p[0]==='cs'&&p[1]) return {page:'cheat', course:p[1]};
   if(p[0]==='dl') return {page:'deadlines'};
+  if(p[0]==='pt'&&p[1]) return {page:'ptitem', item:p[1]};
+  if(p[0]==='pt') return {page:'partiels'};
   return {page:'home'};
 }
 function go(h){ location.hash = h; }
 window.addEventListener('hashchange', render);
+
+/* ---------- PARTIELS ---------- */
+var ptb = null;
+function ptExams(){ return ((D.PARTIELS||{}).exams||[]).slice().sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); }); }
+function ptItem(id){ return ((D.PARTIELS||{}).items||{})[id] || null; }
+function ptDays(dateStr){ var d=new Date(dateStr); if(isNaN(d)) return null; return Math.ceil((d.getTime()-Date.now())/86400000); }
+function ptScores(){ try{ return JSON.parse(localStorage.getItem('c40-pt-v1')||'{}'); }catch(e){ return {}; } }
+function ptScore(id){ return ptScores()[id] || null; }
+function ptSaveScore(id, ok, total){ var s=ptScores(); s[id]={ok:ok,total:total,ts:Date.now()}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
+function ptTotal(){ return ptb ? ptb.item.mcq.length + ptb.item.open.length : 0; }
+function ptStart(id){ var it=ptItem(id); if(!it||it.type!=='blanc') return; ptb={itemId:id, item:it, idx:0, phase:'run', ans:{}, texts:{}}; render(); }
+function ptAnswer(i){ if(!ptb||ptb.phase!=='run') return; if(ptb.idx>=ptb.item.mcq.length) return; ptb.ans[ptb.idx]=i; render(); }
+function ptCapture(){ var ta=document.getElementById('ptTa'); if(ta&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=ta.value; } }
+function ptFinish(){ if(!ptb) return; ptCapture(); var ok=0; ptb.item.mcq.forEach(function(q,i){ if(ptb.ans[i]===q.correct) ok++; }); ptb.score={ok:ok, total:ptb.item.mcq.length}; ptb.phase='done'; ptSaveScore(ptb.itemId, ok, ptb.item.mcq.length); render(); }
+document.addEventListener('input', function(e){ if(e.target&&e.target.id==='ptTa'&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=e.target.value; } });
+function vPartiels(){
+  var html = '<div class="page-h">Partiels</div><div class="page-sub">Must know et partiels blancs au format officiel, du plus proche au plus lointain.</div>';
+  ptExams().forEach(function(ex){
+    var days = ptDays(ex.date);
+    var badge = ex.kind==='exercise'
+      ? '<span class="pt-badge soft">seance d&#39;exercices</span>'
+      : (days!=null && days>=0 ? '<span class="pt-badge">J-'+days+'</span>' : '');
+    var items = (ex.items||[]).map(function(iid){
+      var it = ptItem(iid); if(!it) return '';
+      var det = it.type==='blanc' ? (it.mcq.length+' QCM + '+it.open.length+' ouvertes &middot; '+it.duration+' min') : 'Synthese des Must Know, session par session';
+      var sc = it.type==='blanc' ? ptScore(it.id) : null;
+      var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+'</span>' : '<span class="pt-new">nouveau</span>';
+      return '<button class="pt-item" data-go="#/pt/'+it.id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
+    }).join('');
+    html += '<div class="card pt-exam"><div class="pt-exam-h"><span class="pt-code">'+esc(ex.code)+'</span><div class="pt-exam-t"><b>'+esc(ex.label)+'</b><span>'+esc(ex.name)+'</span></div>'+badge+'</div>'
+      + '<div class="pt-date">'+esc(ex.dateLabel)+'</div>'
+      + '<div class="pt-meta">'+esc(ex.format)+'</div>'
+      + (ex.scope ? '<div class="pt-meta">Perimetre : '+esc(ex.scope)+'</div>' : '')
+      + '<div class="pt-items">'+(items || '<div class="pt-soon">Contenu en preparation</div>')+'</div></div>';
+  });
+  return html;
+}
+function vPtItem(id){
+  var it = ptItem(id);
+  if(!it) return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">Introuvable</div><div class="card"><p style="font-size:13px;color:var(--muted)">Ce contenu n&#39;existe pas.</p></div>';
+  if(it.type==='mustknow') return '<button class="back" data-go="#/pt">&larr; Partiels</button>'
+    + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div>'
+    + '<div class="card"><div class="md">'+mdLite(it.body)+'</div></div>';
+  return vPtBlanc(it);
+}
+function vPtBlanc(it){
+  if(!ptb || ptb.itemId!==it.id) ptb={itemId:it.id, item:it, idx:0, phase:'intro', ans:{}, texts:{}};
+  var back = '<button class="back" data-go="#/pt">&larr; Partiels</button>';
+  if(ptb.phase==='intro'){
+    return back + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">Partial Exam I &middot; format officiel</div>'
+      + '<div class="qcard"><div class="pt-rules">'
+      + '<div>'+IC.clock+'<span>45 minutes &middot; pas de chrono impose ici, chronometre-toi</span></div>'
+      + '<div>'+IC.sheet+'<span>4 QCM a 3 options + 2 questions ouvertes a rediger</span></div>'
+      + '<div>'+IC.data+'<span>Closed book &middot; calculatrice scientifique &middot; corrige detaille devoile a la fin</span></div>'
+      + '</div><p style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:18px">'+esc(it.intro)+'</p>'
+      + '<button class="cta pri" data-act="ptstart" data-id="'+it.id+'">Commencer le partiel blanc</button></div>';
+  }
+  if(ptb.phase==='done'){
+    var h = back + '<div class="page-h">'+esc(it.title)+' &middot; corrige</div>'
+      + '<div class="qcard" style="text-align:center;margin-bottom:16px"><div class="score-big">'+ptb.score.ok+' / '+ptb.score.total+'</div>'
+      + '<p style="color:var(--muted);font-weight:600;margin:6px 0 4px">QCM &middot; corrige detaille ci-dessous</p>'
+      + '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p></div>';
+    ptb.item.mcq.forEach(function(q, i){
+      var mine = ptb.ans[i];
+      var opts = q.choices.map(function(ch, j){
+        var cls = 'opt';
+        if(j===q.correct) cls += ' right';
+        else if(j===mine) cls += ' wrong';
+        else cls += ' dim';
+        return '<div class="'+cls+'"><span class="k">'+'ABC'[j]+'</span><span>'+esc(ch)+'</span></div>';
+      }).join('');
+      var verdict = (mine==null) ? '<span class="pt-badge soft">sans reponse</span>' : (mine===q.correct ? '<span class="pt-done">juste</span>' : '<span class="pt-wrong">faux</span>');
+      h += '<div class="qcard" style="margin-bottom:14px"><div class="qmeta"><span>QCM '+(i+1)+' &middot; '+esc(q.session)+'</span><span style="margin-left:auto">'+verdict+'</span></div>'
+        + '<div class="qq">'+esc(q.q)+'</div>'+opts
+        + '<div class="expl"><b>Corrige :</b> '+esc(q.expl)+'</div></div>';
+    });
+    ptb.item.open.forEach(function(o, i){
+      var txt = (ptb.texts[i]||'').trim();
+      h += '<div class="qcard" style="margin-bottom:14px"><div class="qmeta"><span>'+esc(o.title)+'</span></div>'
+        + '<div class="md" style="margin-bottom:14px">'+mdLite(o.body)+'</div>'
+        + '<div class="pt-your"><b>Ta redaction</b>'+(txt ? esc(txt) : '<i>Non redige</i>')+'</div>'
+        + '<div class="expl" style="margin-top:12px"><b>Solution detaillee :</b><div class="md" style="margin-top:8px">'+mdLite(o.solution)+'</div></div></div>';
+    });
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"><button class="cta pri" data-act="ptretry">Refaire ce partiel blanc</button><button class="cta line" data-go="#/pt">Retour aux partiels</button></div>';
+    return h;
+  }
+  var total = ptTotal(), isMcq = ptb.idx < it.mcq.length;
+  var head = back + '<div class="page-h">'+esc(it.title)+'</div>'
+    + '<div class="qmeta" style="max-width:720px"><span>'+(ptb.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(ptb.idx/total*100)+'%"></i></div><span>45 min</span></div>';
+  var foot = '<div class="qfoot">'
+    + (ptb.idx>0 ? '<button class="cta line" data-act="ptprev">&larr; Precedente</button>' : '<span></span>')
+    + (ptb.idx===total-1 ? '<button class="cta pri" data-act="ptfinish">Terminer et voir le corrige</button>' : '<button class="cta pri" data-act="ptnext">Suivante &rarr;</button>')
+    + '</div>';
+  if(isMcq){
+    var q = it.mcq[ptb.idx], mine = ptb.ans[ptb.idx];
+    var opts = q.choices.map(function(ch, j){
+      return '<button class="opt'+(j===mine?' sel':'')+'" data-act="ptans" data-i="'+j+'"><span class="k">'+'ABC'[j]+'</span><span>'+esc(ch)+'</span></button>';
+    }).join('');
+    return head + '<div class="qcard"><div class="qmeta"><span>QCM '+(ptb.idx+1)+' &middot; '+esc(q.session)+'</span></div><div class="qq">'+esc(q.q)+'</div>'+opts+foot+'</div>';
+  }
+  var oi = ptb.idx - it.mcq.length, o = it.open[oi];
+  return head + '<div class="qcard"><div class="qmeta"><span>'+esc(o.title)+'</span></div>'
+    + '<div class="md" style="margin-bottom:14px">'+mdLite(o.body)+'</div>'
+    + '<textarea id="ptTa" class="pt-ta" placeholder="Redige ta reponse ici, calculs compris. Le corrigé detaille arrive a la fin.">'+esc(ptb.texts[oi]||'')+'</textarea>'
+    + foot + '</div>';
+}
+
 
 /* ---------- DEADLINES ---------- */
 function allDeadlines(){
@@ -213,11 +322,13 @@ var navDef = [
   {page:'course', hash:'#/c/cr', label:'Parcours', icon:IC.grid},
   {page:'quiz', hash:'#/q/cr', label:'QCM', icon:IC.qcm},
   {page:'flash', hash:'#/f/cr', label:'Flashcards', icon:IC.card},
+  {page:'partiels', hash:'#/pt', label:'Partiels', icon:IC.clock},
   {page:'deadlines', hash:'#/dl', label:'Echeances', icon:IC.cal}
 ];
 function navHTML(r){
   return navDef.map(function(n){
     var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat')) || (n.page==='quiz' && r.page==='quiz') || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
+    if(n.page==='partiels' && (r.page==='partiels'||r.page==='ptitem')) on = true;
     if(n.page==='home' && r.page==='home') on = true;
     if(n.page==='deadlines' && r.page==='deadlines') on = true;
     return '<button class="nav'+(on?' on':'')+'" data-go="'+n.hash+'">'+n.icon+'<span>'+n.label+'</span></button>';
@@ -544,6 +655,8 @@ function render(){
     case 'flash': content = vFlash(r.course, r.n); break;
     case 'cheat': content = vCheat(r.course); break;
     case 'deadlines': content = vDeadlines(); break;
+    case 'partiels': content = vPartiels(); break;
+    case 'ptitem': content = vPtItem(r.item); break;
     default: content = vHome();
   }
   root.innerHTML = shell(content, r);
@@ -574,6 +687,12 @@ document.addEventListener('click', function(e){
     if(act==='fcknown'){ fcMark('known'); return; }
     if(act==='fcagain'){ fcMark('again'); return; }
     if(act==='fcretry'){ startFc(fc.cid, fc.n); render(); return; }
+    if(act==='ptstart'){ ptStart(a.getAttribute('data-id')); return; }
+    if(act==='ptans'){ ptAnswer(parseInt(a.getAttribute('data-i'),10)); return; }
+    if(act==='ptnext'){ if(ptb&&ptb.idx<ptTotal()-1){ptb.idx++;render();} return; }
+    if(act==='ptprev'){ if(ptb&&ptb.idx>0){ptb.idx--;render();} return; }
+    if(act==='ptfinish'){ ptFinish(); return; }
+    if(act==='ptretry'){ ptStart(ptb.itemId); return; }
     if(act==='dladd'){
       var lbl = ($('#dlLabel')||{}).value, dt = ($('#dlDate')||{}).value, crs = ($('#dlCourse')||{}).value;
       if(lbl && dt){ var id = 'c'+Date.now(); store.dlCustom[id] = {course:crs, label:lbl, date:dt, kind:'perso'}; save(); render(); }
