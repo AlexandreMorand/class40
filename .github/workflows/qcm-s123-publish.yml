@@ -1,0 +1,188 @@
+name: Publish FM s1-s3 QCM top-ups
+on:
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch data.js
+        run: |
+          cat > /tmp/patch.py <<'END-PATCH-SCRIPT'
+          import json
+
+          NEW = [
+          # ---- S1 (+4) : deck 01 gaps ----
+          {"id":"fm-s1-q17","session":"1","topic":"Three equilibria",
+           "question":"A firm shows a healthy profit and a growing order book, yet it cannot fund its investments from operating cash and its balance sheet keeps deteriorating. Under the session's framework, value creation requires equilibrium across which three statements?",
+           "choices":["The cash flow statement, the income statement and the balance sheet.",
+            "The cash budget, the financial budget and the strategic plan.",
+            "The income statement, the sales budget and the production plan.",
+            "The balance sheet, the tax return and the payroll ledger."],
+           "correct_index":0,
+           "explanation":"Value creation rests on three simultaneous equilibria: cash flow statement, income statement and balance sheet. Profitability alone is not enough if cash and financial structure are out of balance.",
+           "set":2},
+          {"id":"fm-s1-q18","session":"1","topic":"Back testing",
+           "question":"A planning team revises its model every week, systematically comparing each forecast with the actual figures that came in. Which of the six planning practices is the team applying?",
+           "choices":["Building a momentum case from a do-nothing baseline.",
+            "Assigning explicit probability values to all assumptions.",
+            "Back testing the model against actuals.",
+            "Disaggregating inflation rates by cost component."],
+           "correct_index":2,
+           "explanation":"Back testing means regularly revising the model (for example weekly) and comparing forecasts with actuals, so assumptions improve over time.",
+           "set":2},
+          {"id":"fm-s1-q19","session":"1","topic":"Financial budget",
+           "question":"A finance team needs integrated balance sheet, income statement and cash flow projections at annual or quarterly frequency, over roughly a one-year horizon, to drive operational and investment budgeting. Which tool fits this need?",
+           "choices":["The cash budget, run weekly.",
+            "The financial budget.",
+            "The strategic plan, over seven years.",
+            "The aging schedule."],
+           "correct_index":1,
+           "explanation":"The financial budget sits between the cash budget and the financial plan: integrated BS, IS and CF at annual or quarterly frequency over a medium (one year) horizon, used for operational and investment budgeting.",
+           "set":2},
+          {"id":"fm-s1-q20","session":"1","topic":"Cash budget steps",
+           "question":"What is the correct sequence of steps for building a cash budget?",
+           "choices":["Forecast uses of cash, then sources of cash, then set the opening balance.",
+            "Plan the funding first, then forecast sources and uses of cash.",
+            "Compute the surplus or shortage first, then forecast sources and uses.",
+            "Forecast sources of cash, forecast uses of cash, compute the shortage or surplus, then plan how to raise or invest cash."],
+           "correct_index":3,
+           "explanation":"The cash budget starts from forecast sources, subtracts forecast uses to find the periodic shortage or surplus, and only then draws up the plan for raising or investing cash.",
+           "set":2},
+          # ---- S2 (+5) : deck 02 gaps ----
+          {"id":"fm-s2-q16","session":"2","topic":"Operating vs cash cycle",
+           "question":"A firm's inventory period is 60 days and its receivable period is 45 days; it pays its suppliers in 40 days. What are its operating cycle and its cash cycle?",
+           "choices":["Operating cycle 65 days, cash cycle 105 days.",
+            "Operating cycle 145 days, cash cycle 105 days.",
+            "Operating cycle 105 days, cash cycle 145 days.",
+            "Operating cycle 105 days, cash cycle 65 days."],
+           "correct_index":3,
+           "explanation":"The operating cycle is inventory period plus receivable period (60 + 45 = 105 days). The cash cycle subtracts the payables period (105 - 40 = 65 days), measuring how long the firm's own cash is tied up.",
+           "set":2},
+          {"id":"fm-s2-q17","session":"2","topic":"Aging schedule",
+           "question":"Within its collection policy, what does a firm use an aging schedule for?",
+           "choices":["Tracking the age of inventory sitting in the warehouse.",
+            "Tracking the seniority and tenor of its supplier base.",
+            "Tracking the maturity profile of its outstanding bank debt.",
+            "Tracking the proportion of receivables that are mildly or badly overdue."],
+           "correct_index":3,
+           "explanation":"The aging schedule shows the proportion of accounts that are mildly or badly overdue, so the firm can monitor how promptly bills are paid.",
+           "set":2},
+          {"id":"fm-s2-q18","session":"2","topic":"Factoring",
+           "question":"A small firm cannot afford a fully fledged credit and collection operation, while a large rival reaps economies of scale in record keeping, billing and collection. What does the session suggest for the small firm?",
+           "choices":["Farm out part of the credit and collection job to a factor.",
+            "Stop granting trade credit to any customer.",
+            "Demand cash before delivery from all customers.",
+            "Extend its payables instead of managing receivables."],
+           "correct_index":0,
+           "explanation":"A small firm that cannot support a full credit operation can farm out part of the job to a factor, which handles record keeping, billing and collection.",
+           "set":2},
+          {"id":"fm-s2-q19","session":"2","topic":"Credit analysis focus",
+           "question":"A credit manager with limited time must decide where to concentrate credit analysis effort on the customer portfolio. What do the slides recommend?",
+           "choices":["Spread effort equally across all credit applications.",
+            "Concentrate on the large and doubtful accounts.",
+            "Concentrate on customers with the longest relationship.",
+            "Concentrate on accounts below the materiality threshold."],
+           "correct_index":1,
+           "explanation":"Credit work should concentrate on the dangerous accounts: large exposures and doubtful payers, not spread evenly over every application.",
+           "set":2},
+          {"id":"fm-s2-q20","session":"2","topic":"Terms of sale",
+           "question":"According to the slides, a seller may reasonably allow more extended payment terms when which conditions hold?",
+           "choices":["Goods resell quickly and customer accounts are small.",
+            "The seller is facing a liquidity squeeze.",
+            "Customers are low-risk, accounts are large, buyers need time to check quality, and goods are not quickly resold.",
+            "The goods are perishable and the industry demands short terms."],
+           "correct_index":2,
+           "explanation":"Sellers grant longer terms when customers are low-risk, accounts are large, buyers need time to check the quality of the goods, and the goods are not quickly resold.",
+           "set":2},
+          # ---- S3 (+4) : deck 03 gaps ----
+          {"id":"fm-s3-q17","session":"3","topic":"Direct input",
+           "question":"While building a financial plan, an analyst enters next year's new bank loan issues by typing the contractual emission amounts year by year, exactly as agreed with the bank. Which forecasting technique is this?",
+           "choices":["Indirect input driven by a ratio.",
+            "Direct input forecasting.",
+            "A control account closure.",
+            "Back testing against actuals."],
+           "correct_index":1,
+           "explanation":"Direct input means forecasting currency amounts explicitly, as with scheduled new debt issues. Indirect input instead derives the figure from a driver such as a percentage of revenues.",
+           "set":2},
+          {"id":"fm-s3-q18","session":"3","topic":"Control account",
+           "question":"How does a control account forecast a balance sheet item such as tangible assets?",
+           "choices":["By applying a fixed percentage of sales to the item.",
+            "By holding the item constant over the plan horizon.",
+            "By forecasting increases and decreases separately, then closing the account as BOP plus increases minus decreases equals EOP.",
+            "By deriving the item directly from the cash flow statement."],
+           "correct_index":2,
+           "explanation":"A control account introduces no new forecasting assumption for the closing balance: increases (for example capex) and decreases (depreciation) are forecast separately, and EOP equals BOP plus increases minus decreases.",
+           "set":2},
+          {"id":"fm-s3-q19","session":"3","topic":"Circularity",
+           "question":"Why does a financial plan become circular once interest income and expense are modeled on cash and debt balances?",
+           "choices":["Because dividends depend on share capital, which depends on dividends.",
+            "Because depreciation depends on historical capex, which depends on depreciation.",
+            "Because sales depend on market share, which depends on sales.",
+            "Because interest depends on debt and cash balances, which depend on the year's cash flow, which itself depends on interest."],
+           "correct_index":3,
+           "explanation":"Interest is computed on average debt and cash, but those balances depend on the cash flow of the year, which is only known after interest is included. The loop is closed with iterative calculation or by linking interest to opening balances only.",
+           "set":2},
+          {"id":"fm-s3-q20","session":"3","topic":"Top-down sales forecast",
+           "question":"Under the top-down approach to forecasting sales in a financial plan, how are revenues computed?",
+           "choices":["Market volume times market price, times the company's market share.",
+            "The sum of business unit forecasts built bottom-up.",
+            "Last year's sales grown at the consumer inflation rate.",
+            "Production capacity times the utilization rate."],
+           "correct_index":0,
+           "explanation":"The top-down approach estimates total industry size and the company's share of it: revenues equal (market volume times market price) times market share. Bottom-up instead aggregates business units and adds organic and M&A growth.",
+           "set":2},
+          ]
+
+          raw = open('data.js','rb').read().decode()
+          body = raw[len('window.C40DATA='):-2]
+          d = json.loads(body)
+          fm = d['QCM']['fm']
+          existing_ids = {q['id'] for q in fm}
+          for nq in NEW:
+              assert nq['id'] not in existing_ids, nq['id']
+              fm.append(nq)
+          # set moves: split each of S1/S2/S3 into 10 + 10
+          moves = {'1': ['fm-s1-q%d'%i for i in range(11,17)],
+                   '2': ['fm-s2-q%d'%i for i in range(11,16)],
+                   '3': ['fm-s3-q%d'%i for i in range(11,17)]}
+          for q in fm:
+              if q['id'] in moves.get(q['session'], []):
+                  q['set'] = 2
+          out = 'window.C40DATA=' + json.dumps(d, ensure_ascii=True, separators=(',',':')) + ';\n'
+          open('data.js','w').write(out)
+          # verification
+          from collections import Counter
+          for ses in ('1','2','3'):
+              qs=[q for q in fm if q['session']==ses]
+              print('S'+ses, len(qs), 'sets:', dict(Counter(q.get('set',1) for q in qs)), 'answers:', dict(Counter(q['correct_index'] for q in qs)))
+          print('fm total:', len(fm))
+
+          END-PATCH-SCRIPT
+          python3 /tmp/patch.py
+      - name: Bump service worker cache
+        run: |
+          sed -i "s|CACHE='c40-fiche-fm9-20261015'|CACHE='c40-qcm-s123-20261015'|" sw.js
+          grep -c 'c40-qcm-s123-20261015' sw.js
+          python3 -c "
+          import json
+          raw=open('data.js').read()
+          d=json.loads(raw[len('window.C40DATA='):-2])
+          fm=d['QCM']['fm']
+          from collections import Counter
+          for ses in ('1','2','3'):
+              qs=[q for q in fm if q['session']==ses]
+              assert len(qs)==20, ses
+              assert Counter(q.get('set',1) for q in qs)==Counter({1:10,2:10}), ses
+          print('OK fm total', len(fm))
+          "
+      - name: Commit and self-destruct
+        run: |
+          git config user.name 'class40-bot'
+          git config user.email 'bot@class40.local'
+          git add data.js sw.js
+          git rm -q .github/workflows/qcm-s123-publish.yml
+          git commit -m 'FM s1-s3 QCM top-ups: 20 each, split 10+10 (bank 160)'
+          git push
