@@ -1,0 +1,342 @@
+name: Publish FM s1-s3 QCM set 3
+on:
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch data.js
+        run: |
+          cat > /tmp/patch.py <<'END-PATCH-SCRIPT'
+          import json
+
+          NEW = [
+          # ===== S1 set 3 (deck 01) =====
+          {"id":"fm-s1-q21","session":"1","topic":"Toys R Us sequence",
+           "question":"Which sequence correctly orders the four stages of the Toys R Us case discussed in the session?",
+           "choices":["Market shift, liquidity strain, pre-crisis leverage, crisis.",
+            "Pre-crisis leverage from the 2005 buyout, market shift toward e-commerce, liquidity strain from heavy financial charges, crisis ending in the 2017 Chapter 11 filing.",
+            "Pre-crisis profitability, crisis in 2005, market shift, recovery in 2017.",
+            "Liquidity strain, pre-crisis buyout, crisis, market shift."],
+           "correct_index":1,
+           "explanation":"The case runs: leveraged buyout in 2005, rise of e-commerce pressure, high debt charges straining cash and capex, then failure to adapt and the 2017 Chapter 11 filing.",
+           "set":3},
+          {"id":"fm-s1-q22","session":"1","topic":"Value creation rationale",
+           "question":"The session gives several reasons why firms should focus on value creation. Which reason concerns its applicability?",
+           "choices":["It is sector and lifecycle agnostic, so it applies to any industry and any stage of the corporate life cycle.",
+            "It is required by accounting regulators in every jurisdiction.",
+            "It always maximizes short-term market share.",
+            "It removes the need for any financial measurement."],
+           "correct_index":0,
+           "explanation":"Value creation is rational, broadly accepted by stakeholders, measurable through valuation techniques, and sector and lifecycle agnostic.",
+           "set":3},
+          {"id":"fm-s1-q23","session":"1","topic":"Business plan functions",
+           "question":"Beyond financing and restructuring, a financial plan embedded in a structured planning process serves several functions. Which of the following is NOT one of them?",
+           "choices":["Clarifying business content and feasibility.",
+            "Supporting performance tracking of forecast versus actual.",
+            "Facilitating communication and negotiation with debt and equity markets.",
+            "Guaranteeing the accuracy of the forecasts it contains."],
+           "correct_index":3,
+           "explanation":"The plan clarifies feasibility, tests realism, supports forecast-versus-actual tracking, acts as a management tool and facilitates market communication. It cannot guarantee forecast accuracy.",
+           "set":3},
+          {"id":"fm-s1-q24","session":"1","topic":"Uncertainty trends",
+           "question":"According to the World Uncertainty Index evidence shown in the session, what is the recent pattern of uncertainty spikes?",
+           "choices":["Spikes are becoming rarer but more severe.",
+            "Spikes are becoming more frequent and are getting higher.",
+            "Spikes have disappeared since 2020.",
+            "Spikes follow a stable ten-year cycle."],
+           "correct_index":1,
+           "explanation":"The WUI shows spikes becoming more frequent and getting higher over time, which is why planning must explicitly handle uncertainty.",
+           "set":3},
+          {"id":"fm-s1-q25","session":"1","topic":"Explicit probabilities",
+           "question":"A head of FP&A requires every planning assumption to carry a clear probability estimate and appoints a single model owner to keep scenarios consistent. Which of the six practices for planning under uncertainty is being applied?",
+           "choices":["Using explicit probability values for all assumptions.",
+            "Disaggregating inflation rates.",
+            "Back testing the model weekly.",
+            "Building the momentum case."],
+           "correct_index":0,
+           "explanation":"The first McKinsey practice is to attach explicit probability values to assumptions, with a model owner (ideally the Head of FP&A) ensuring consistency.",
+           "set":3},
+          {"id":"fm-s1-q26","session":"1","topic":"Bear case",
+           "question":"Why do the planning guidelines insist on making an explicit bear case, citing the line that everyone has a plan until they get punched in the mouth?",
+           "choices":["A plausible downside scenario lets the team adjust assumptions as warning signals emerge and avoids decision paralysis.",
+            "A bear case is required to calculate the momentum case.",
+            "A bear case removes the need for probability estimates.",
+            "A bear case guarantees the firm survives a crisis."],
+           "correct_index":0,
+           "explanation":"Including a plausible downside scenario prepares the organization to react to early warning signals instead of freezing when conditions deteriorate.",
+           "set":3},
+          {"id":"fm-s1-q27","session":"1","topic":"Macro assumptions",
+           "question":"When setting macroeconomic assumptions such as GDP growth for a plan, what do the planning guidelines recommend?",
+           "choices":["Use the most optimistic single forecast available.",
+            "Use the company's own internal estimate only.",
+            "Use consistent and credible sources, prefer weighted averages of independent forecasts, and compare them with historical data.",
+            "Fix assumptions once and never revisit them."],
+           "correct_index":2,
+           "explanation":"Clarity and consistency in macro assumptions come from credible sources, weighted averages of independent forecasts and comparison with history.",
+           "set":3},
+          {"id":"fm-s1-q28","session":"1","topic":"Cash budget purpose",
+           "question":"What is the primary purpose of a cash budget?",
+           "choices":["Forecast periodic cash balances so the firm can plan funding needs or the use of surpluses.",
+            "Maximize reported accounting profit.",
+            "Set the firm's dividend policy.",
+            "Replace the income statement for tax filing."],
+           "correct_index":0,
+           "explanation":"The cash budget forecasts periodic cash balances to plan funding needs or the investment of surpluses, translating accrual events into cash flows.",
+           "set":3},
+          {"id":"fm-s1-q29","session":"1","topic":"Sources of cash",
+           "question":"In a cash budget, the sale of a warehouse, a paid-in capital increase and interest received on a deposit belong to which categories of sources?",
+           "choices":["All three are operating sources.",
+            "Investing, financing and other activities respectively.",
+            "Financing, investing and operating respectively.",
+            "All three are financing sources."],
+           "correct_index":1,
+           "explanation":"Selling property is an investing source, a paid-in capital increase is a financing source, and interest income falls under other activities.",
+           "set":3},
+          {"id":"fm-s1-q30","session":"1","topic":"Uses of cash",
+           "question":"Which grouping correctly classifies uses of cash in a cash budget?",
+           "choices":["Salaries are investing, loan repayments are operating, equipment purchases are financing.",
+            "Taxes are financing, dividends are operating, bond repayments are investing.",
+            "Cash purchases are operating, equipment purchases are investing, loan repayments and dividends are financing.",
+            "Rent is financing, interest payments are operating, inventory purchases are investing."],
+           "correct_index":2,
+           "explanation":"Operating uses cover purchases, salaries, rent and taxes; investing uses cover purchases of PPE, securities and intangibles; financing uses cover interest, loan repayments and dividends.",
+           "set":3},
+          # ===== S2 set 3 (deck 02) =====
+          {"id":"fm-s2-q21","session":"2","topic":"Period definitions",
+           "question":"In the cash cycle framework, what does the receivable period measure?",
+           "choices":["The delay between the purchase of raw materials and their payment.",
+            "The delay between the sale of goods and the moment customers pay their bills.",
+            "The delay between investing in inventories and selling the finished goods.",
+            "The delay between ordering and receiving raw materials."],
+           "correct_index":1,
+           "explanation":"The receivable period runs from the sale to cash collection. The inventory period runs from the investment in inventories to the sale, and the payables period from purchase to payment of raw materials.",
+           "set":3},
+          {"id":"fm-s2-q22","session":"2","topic":"Benefits of holding inventory",
+           "question":"Which list gives the benefits of holding inventory named in the session?",
+           "choices":["Lower storage costs, lower capital costs, fewer orders.",
+            "Delivery on time, bulk purchase discounts, ability to meet unexpected increases in demand.",
+            "Higher order costs, slower production, more receivables.",
+            "Tax advantages, depreciation shields, supplier financing."],
+           "correct_index":1,
+           "explanation":"Holding inventory lets the firm deliver on time, buy in bulk at a discount and meet unexpected demand. These benefits trade off against carrying and order costs.",
+           "set":3},
+          {"id":"fm-s2-q23","session":"2","topic":"Carrying vs order costs",
+           "question":"In the inventory trade-off, what do carrying costs include?",
+           "choices":["Handling and delivery costs of each order.",
+            "The purchase price of the goods.",
+            "The cost of storage and the opportunity cost of capital tied up in stock.",
+            "The cost of negotiating with suppliers."],
+           "correct_index":2,
+           "explanation":"Carrying costs are the cost of storage plus the opportunity cost of the capital invested in inventory; order costs are handling and delivery costs.",
+           "set":3},
+          {"id":"fm-s2-q24","session":"2","topic":"Order frequency",
+           "question":"A firm faces high carrying costs and low order costs. According to the inventory trade-off, what ordering pattern makes sense?",
+           "choices":["Rare, very large orders.",
+            "More frequent orders in smaller quantities.",
+            "A single annual order covering all demand.",
+            "Ordering only after stockouts occur."],
+           "correct_index":1,
+           "explanation":"When storage and capital costs are high while placing an order is cheap, the firm minimizes total cost by ordering more often in smaller lots.",
+           "set":3},
+          {"id":"fm-s2-q25","session":"2","topic":"Terms of sale, COD and CBD",
+           "question":"Not all sales involve trade credit. What do cash on delivery (COD) and cash before delivery (CBD) have in common?",
+           "choices":["Both give the customer a long period to pay.",
+            "Both require the seller to run credit analysis first.",
+            "Both eliminate or avoid granting payment time to the customer.",
+            "Both apply only to perishable goods."],
+           "correct_index":2,
+           "explanation":"COD and CBD are terms of sale without trade credit: payment happens at or before delivery, so no collection period arises.",
+           "set":3},
+          {"id":"fm-s2-q26","session":"2","topic":"Credit analysis sources",
+           "question":"A credit manager wants an outside view on whether customers will pay. Which sources do the slides name?",
+           "choices":["Specialist assessors such as Dun and Bradstreet or Cerved for small companies, and Moody's or Standard and Poor's for firms with rated bonds.",
+            "Only the customer's marketing materials.",
+            "Only the seller's sales force opinions.",
+            "Only the customer's tax returns."],
+           "correct_index":0,
+           "explanation":"Credit analysis combines the firm's own reading of customer financial statements with specialist views: Dun and Bradstreet or Cerved for small companies, Moody's and S&P for bond issuers.",
+           "set":3},
+          {"id":"fm-s2-q27","session":"2","topic":"Look beyond the order",
+           "question":"A borderline customer applies for credit on a single order, but there is a good chance it will become a regular and reliable buyer. What does the credit allocation guidance say?",
+           "choices":["Always refuse borderline applicants.",
+            "The credit decision is dynamic: it can be worth accepting a relatively poor risk today for future business.",
+            "Extend credit only if the order is prepaid.",
+            "Judge every order in isolation from the relationship."],
+           "correct_index":1,
+           "explanation":"Credit decisions should look beyond the immediate order: the value of a future regular customer can justify accepting a relatively poor current risk.",
+           "set":3},
+          {"id":"fm-s2-q28","session":"2","topic":"Lending when the bank refuses",
+           "question":"A customer's bank cuts its credit line. Under which conditions can it still make sense for the supplier to keep extending trade credit?",
+           "choices":["Never: if the bank refuses, the supplier must refuse too.",
+            "Always: trade credit is safer than bank lending.",
+            "Only if the customer offers to pay interest on the overdue balance.",
+            "When the supplier knows the customer's business better than the bank, and when cutting credit would sacrifice profitable future sales if the customer failed."],
+           "correct_index":3,
+           "explanation":"Two reasons justify continuing: an information advantage over the bank, and the loss of profitable future sales if the customer goes out of business.",
+           "set":3},
+          {"id":"fm-s2-q29","session":"2","topic":"Sales-collection synergy",
+           "question":"What does a synergetic link between the sales department and the collection department look like in practice?",
+           "choices":["Sales decides which invoices are never collected.",
+            "Collection sets the product prices.",
+            "The firm may support a customer financially, for example granting a loan when the customer is cut off by its own bank.",
+            "The two departments never exchange information."],
+           "correct_index":2,
+           "explanation":"The slides illustrate synergy with the sales and collection functions cooperating, even to the point of supporting a customer cut off by its bank.",
+           "set":3},
+          {"id":"fm-s2-q30","session":"2","topic":"Cash cycle interpretation",
+           "question":"Firm A has a cash cycle of 20 days and firm B one of 80 days, in the same industry. All else equal, what does the difference indicate?",
+           "choices":["Firm B ties up its own cash in operations for 60 days longer, so it needs more working capital financing.",
+            "Firm B is more profitable by definition.",
+            "Firm A must be paying its suppliers too late.",
+            "The cash cycle says nothing about financing needs."],
+           "correct_index":0,
+           "explanation":"The cash cycle measures how long the firm's own cash is locked into the operating process; a longer cycle means more working capital to finance.",
+           "set":3},
+          # ===== S3 set 3 (deck 03) =====
+          {"id":"fm-s3-q21","session":"3","topic":"Business plan definition",
+           "question":"What does a business plan do, in the definition given in the session?",
+           "choices":["It files the company's annual tax return.",
+            "It outlines strategic and operational direction, translating strategic intentions into actions and generating both economic performance expectations and capital requirements.",
+            "It lists only the marketing initiatives for next year.",
+            "It replaces the financial statements for investors."],
+           "correct_index":1,
+           "explanation":"The business plan defines objectives, business model, investment needs and organization, and it is the foundation on which financial planning is built.",
+           "set":3},
+          {"id":"fm-s3-q22","session":"3","topic":"Three requirements",
+           "question":"A plan shows aggressive revenue growth that the cash flow statement cannot fund. Which of the three business plan requirements is failing?",
+           "choices":["Reliability of assumptions.",
+            "Consistency with the industrial plan.",
+            "Financial sustainability, the ability to self-finance and stay solvent over time.",
+            "The presentation format."],
+           "correct_index":2,
+           "explanation":"Financial sustainability requires the plan to keep the company self-financed and solvent. Reliability concerns realistic assumptions, consistency the alignment with strategy and timing.",
+           "set":3},
+          {"id":"fm-s3-q23","session":"3","topic":"Modeling definition",
+           "question":"What is financial modeling, as defined in the session?",
+           "choices":["The technical activity that converts the business plan into a set of integrated, dynamic balance sheet, income statement and cash flow statements in Excel.",
+            "The design of the company's logo and investor deck.",
+            "A statistical forecast of stock prices.",
+            "The audit of historical financial statements."],
+           "correct_index":0,
+           "explanation":"Financial modeling represents the business plan as integrated, dynamic BS, IS and CF statements; the forecast financials are one part of the wider strategic business plan.",
+           "set":3},
+          {"id":"fm-s3-q24","session":"3","topic":"Plan purposes by user",
+           "question":"Match the user to the typical purpose of a financial model: an investment banker working on an acquisition, and a research analyst.",
+           "choices":["Both use it mainly for variance analysis.",
+            "Valuation backup for the deal, and an investment recommendation respectively.",
+            "Both use it mainly to renegotiate debt terms.",
+            "Payroll planning, and tax filing respectively."],
+           "correct_index":1,
+           "explanation":"In M&A the model backs the valuation (including exit planning); equity research analysts use it to support investment recommendations. Management uses it for long-term plans and variance analysis.",
+           "set":3},
+          {"id":"fm-s3-q25","session":"3","topic":"Model principles",
+           "question":"A model builder strips out every feature that does not serve the model's end use, keeping it as simple as possible while meeting user needs. Which two key principles does this apply?",
+           "choices":["Fitness for purpose and simplicity.",
+            "Consistency and integrity.",
+            "Clarity and efficiency only.",
+            "Integrity and fitness for purpose."],
+           "correct_index":0,
+           "explanation":"Fitness for purpose ties design to the end use; simplicity keeps the model as simple as possible while meeting user needs. Clarity, efficiency, consistency and integrity complete the six principles.",
+           "set":3},
+          {"id":"fm-s3-q26","session":"3","topic":"Indirect input steps",
+           "question":"An analyst forecasts service costs as a percentage of revenues. What is the correct three-step sequence of this indirect forecasting?",
+           "choices":["Apply the ratio first, then compute the historical driver, then choose the forecast driver.",
+            "Choose the forecast driver, apply it, then audit the historicals.",
+            "Compute the historical driver ratio, choose the forecast driver, then apply the ratio in reverse to the driver.",
+            "Fix costs constant, then grow revenues, then reconcile."],
+           "correct_index":2,
+           "explanation":"Indirect input starts from the historical driver ratio (for example service costs as a percentage of revenues), selects the forecast driver value, and applies the ratio in reverse to get the forecast amount.",
+           "set":3},
+          {"id":"fm-s3-q27","session":"3","topic":"Opex drivers",
+           "question":"Which approaches to forecasting variable operating costs does the session describe?",
+           "choices":["Only a historical average, kept constant forever.",
+            "Only the inflation rate applied to last year's costs.",
+            "Only management discretion with no driver.",
+            "An indirect driver such as a percentage of sales, estimated as a historical average or a management target, possibly evolving over the horizon (flat, growing, or a target reached gradually)."],
+           "correct_index":3,
+           "explanation":"Variable opex uses an indirect driver such as percentage of sales or volumes; the ratio can be flatlined, growing (for example economies of scale) or glide toward a final-year management target.",
+           "set":3},
+          {"id":"fm-s3-q28","session":"3","topic":"D&A detailed approach",
+           "question":"Under the detailed approach to D&A, how is each year's capex depreciated, and what is the first-year convention?",
+           "choices":["Each year's capex is depreciated over its target useful life, and by best practice the first year's charge is halved.",
+            "All capex is expensed immediately.",
+            "Each year's capex is depreciated over one year in full.",
+            "Only past capex is depreciated, new capex never is."],
+           "correct_index":0,
+           "explanation":"The detailed approach depreciates each vintage of capex over its useful life (charge equals asset over life or asset times the amortization rate), halving the first year's D&A; historical fixed assets keep amortizing until expiry.",
+           "set":3},
+          {"id":"fm-s3-q29","session":"3","topic":"Tax forecast",
+           "question":"Which two drivers does the session offer for forecasting income taxes, and why is the tax line incomplete at that stage?",
+           "choices":["Only the statutory rate; incomplete because revenues are missing.",
+            "The historical effective tax rate (taxes over EBT) or each country's regulatory rates; incomplete because EBT is still missing interest, which is recorded above it.",
+            "Only the VAT rate; incomplete because dividends are missing.",
+            "Only last year's taxes; incomplete because capex is missing."],
+           "correct_index":1,
+           "explanation":"Taxes are forecast with the historical effective rate or with regulatory rates (for example Italy's IRES 24% plus IRAP 3.9%); the base EBT is incomplete until interest is modeled.",
+           "set":3},
+          {"id":"fm-s3-q30","session":"3","topic":"Debt forecast approaches",
+           "question":"What distinguishes the two gross debt forecasting approaches in the session?",
+           "choices":["One models specific maturities as BOP debt plus new issues minus repayments, so no unplanned debt is raised; the other drives EOP debt with a target or historical leverage ratio, implying a net effect of raising and repaying.",
+            "One applies only to bonds, the other only to equity.",
+            "One uses interest rates, the other uses tax rates.",
+            "There is no difference; both ignore repayments."],
+           "correct_index":0,
+           "explanation":"The schedule approach closes debt as a control account from known issues and repayments; the leverage-target approach sets EOP debt at once via a ND/E driver, implicitly netting new raising against repayment.",
+           "set":3},
+          ]
+
+
+          ROT = {"fm-s1-q22":1, "fm-s1-q26":2, "fm-s2-q27":2, "fm-s2-q22":1, "fm-s3-q23":1, "fm-s3-q28":2}
+          for q in NEW:
+              k = ROT.get(q["id"])
+              if k:
+                  q["choices"] = q["choices"][k:] + q["choices"][:k]
+                  q["correct_index"] = (q["correct_index"] - k) % 4
+
+          raw = open('data.js','rb').read().decode()
+          body = raw[len('window.C40DATA='):-2]
+          d = json.loads(body)
+          fm = d['QCM']['fm']
+          existing = {q['id'] for q in fm}
+          for nq in NEW:
+              assert nq['id'] not in existing, nq['id']
+              fm.append(nq)
+          out = 'window.C40DATA=' + json.dumps(d, ensure_ascii=True, separators=(',',':')) + ';' + chr(10)
+          open('data.js','w').write(out)
+          from collections import Counter
+          for ses in ('1','2','3'):
+              qs=[q for q in fm if q['session']==ses]
+              s3=[q for q in qs if q.get('set')==3]
+              print('S'+ses, len(qs), dict(Counter(q.get('set',1) for q in qs)), 'set3:', dict(Counter(x['correct_index'] for x in s3)))
+          print('fm total:', len(fm))
+
+          END-PATCH-SCRIPT
+          python3 /tmp/patch.py
+      - name: Bump service worker cache
+        run: |
+          sed -i "s|CACHE='c40-qcm-s123-20261015'|CACHE='c40-qcm-set3-20261015'|" sw.js
+          grep -c 'c40-qcm-set3-20261015' sw.js
+          python3 -c "
+          import json
+          raw=open('data.js').read()
+          d=json.loads(raw[len('window.C40DATA='):-2])
+          fm=d['QCM']['fm']
+          from collections import Counter
+          for ses in ('1','2','3'):
+              qs=[q for q in fm if q['session']==ses]
+              assert len(qs)==30, ses
+              assert Counter(q.get('set',1) for q in qs)==Counter({1:10,2:10,3:10}), ses
+          print('OK fm total', len(fm))
+          "
+      - name: Commit and self-destruct
+        run: |
+          git config user.name 'class40-bot'
+          git config user.email 'bot@class40.local'
+          git add data.js sw.js
+          git rm -q .github/workflows/qcm-set3-publish.yml
+          git commit -m 'FM s1-s3 QCM set 3: 10 new questions each (bank 190)'
+          git push
