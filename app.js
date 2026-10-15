@@ -361,7 +361,7 @@ function courseChips(active){
   }).join('')+'</div>';
 }
 function chapterRows(cid, limit){
-  var ss = sessionsOf(cid);
+  var ss = sessionsOf(cid).filter(function(s){ return bank(cid,s.key).length>0 || cards(cid,s.key).length>0 || !!ficheUrl(cid,s.key); });
   var rows = ss.map(function(s){
     var p = sessionProgress(cid, s.key);
     var cls = p.pct===100 ? 'done' : (p.done>0 ? 'cur' : '');
@@ -605,7 +605,7 @@ function buildIndex(){
   if(searchIdx) return searchIdx;
   var idx = [];
   COURSES.forEach(function(c){
-    sessionsOf(c.id).forEach(function(s){ idx.push({k:'Session', label:c.code+' S'+s.n+' - '+s.title, hash:'#/s/'+c.id+'/'+s.key, hay:(c.name+' '+s.title+' session '+s.n+' '+(s.part||'')).toLowerCase()}); });
+    sessionsOf(c.id).forEach(function(s){ if(!(bank(c.id,s.key).length||cards(c.id,s.key).length||ficheUrl(c.id,s.key))) return; idx.push({k:'Session', label:c.code+' S'+s.n+' - '+s.title, hash:'#/s/'+c.id+'/'+s.key, hay:(c.name+' '+s.title+' session '+s.n+' '+(s.part||'')).toLowerCase()}); });
     (D.FLASHCARDS[c.id]||[]).forEach(function(f){ idx.push({k:'Carte', label:f.front, hash:'#/f/'+c.id+'/'+f.session, hay:f.front.toLowerCase()}); });
     var topics = {};
     (D.QCM[c.id]||[]).forEach(function(q){ if(q.topic && !topics[q.topic]){ topics[q.topic]=q; } });
