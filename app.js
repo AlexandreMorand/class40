@@ -41,6 +41,28 @@ function bank(cid, n, set){
   if(set!=null) b = b.filter(function(q){ return (q.set||1)===set; });
   return b;
 }
+function levelBank(cid,n,level){
+  var groups = (D.QCM_LEVELS||{})[cid]||{};
+  var b = groups[String(n)]||[];
+  return level==null ? b : b.filter(function(q){ return q.level===level; });
+}
+function levelLabel(level){ return ['','Medium','Difficile','Expert'][level]||''; }
+function levelProgress(cid,n,level){
+  var b=levelBank(cid,n,level),m=bestByQuestion(),done=0,corr=0;
+  b.forEach(function(q){var a=m[questionProgressKey(cid,q)];if(a){done++;if(a.correct)corr++;}});
+  return {done:done,total:b.length,pct:b.length?Math.round(done/b.length*100):0,acc:done?Math.round(corr/done*100):0};
+}
+function allQuestions(cid){
+  var a=(D.QCM[cid]||[]).slice(),groups=(D.QCM_LEVELS||{})[cid]||{};
+  Object.keys(groups).forEach(function(n){a=a.concat(groups[n]);});return a;
+}
+function levelTiles(cid,n){
+  var descriptions=['','Application et raisonnement, sans questions de simple recitation.','Calculs lies et cas a plusieurs etapes.','Cas integres, contraintes et pieges de modelisation.'];
+  return [1,2,3].filter(function(l){return levelBank(cid,n,l).length;}).map(function(l){
+    var p=levelProgress(cid,n,l);
+    return '<div class="tile" data-go="#/q/'+cid+'/'+n+'/level'+l+'"><span class="ic">'+IC.qcm+'</span><b>QCM '+l+' &middot; '+levelLabel(l)+'</b><span>'+descriptions[l]+'</span><span>'+p.done+'/'+p.total+' questions &middot; '+p.acc+'% reussite</span><div class="bar"><i class="'+(p.pct===100?'full':'')+'" data-w="'+p.pct+'"></i></div><span class="arrow">'+(p.done?'Continuer':'Commencer')+' &rarr;</span></div>';
+  }).join('');
+}
 function setsOf(cid, n){
   var m = {}, out = [];
   bank(cid,n).forEach(function(q){ var s = q.set||1; if(!m[s]){ m[s]=1; out.push(s); } });
@@ -111,20 +133,20 @@ function bestByQuestion(){
   return m;
 }
 function sessionProgress(cid, n){
-  var b = bank(cid,n); if(!b.length) return {done:0,total:0,pct:0,acc:0};
+  var b = bank(cid,n).concat(levelBank(cid,n)); if(!b.length) return {done:0,total:0,pct:0,acc:0};
   var m = bestByQuestion(), done=0, corr=0;
   b.forEach(function(q){ var key=questionProgressKey(cid,q); if(m[key]){ done++; if(m[key].correct) corr++; } });
   return {done:done, total:b.length, pct:Math.round(done/b.length*100), acc:done?Math.round(corr/done*100):0};
 }
 function courseProgress(cid){
-  var all = D.QCM[cid]||[]; if(!all.length) return {pct:0, done:0, total:0};
+  var all = allQuestions(cid); if(!all.length) return {pct:0, done:0, total:0};
   var m = bestByQuestion(), done=0;
   all.forEach(function(q){ if(m[questionProgressKey(cid,q)]) done++; });
   return {pct:Math.round(done/all.length*100), done:done, total:all.length};
 }
 function globalProgress(){
   var tot=0, done=0; var m = bestByQuestion();
-  COURSES.forEach(function(c){ (D.QCM[c.id]||[]).forEach(function(q){ tot++; if(m[questionProgressKey(c.id,q)]) done++; }); });
+  COURSES.forEach(function(c){ allQuestions(c.id).forEach(function(q){ tot++; if(m[questionProgressKey(c.id,q)]) done++; }); });
   return {pct: tot?Math.round(done/tot*100):0, done:done, total:tot};
 }
 function accuracy(){
@@ -438,6 +460,12 @@ function vCourse(cid){
   + (allDeadlines().filter(function(d){ return d.course===cid; }).map(dlRow).join('') || '<p style="font-size:12.5px;color:var(--muted)">Aucune.</p>')
   + '</div></aside></div>';
 }
+function legacyTiles(cid,n){
+  return setsOf(cid,n).map(function(sn){
+    var bp=setProgress(cid,n,sn),multi=setsOf(cid,n).length>1;
+    return '<div class="tile" data-go="#/q/'+cid+'/'+n+'/set'+sn+'"><span class="ic">'+IC.qcm+'</span><b>'+(multi?'QCM '+sn:'QCM')+'</b><span>'+bp.done+'/'+bp.total+' questions &middot; '+bp.acc+'% reussite</span><div class="bar"><i class="'+(bp.pct===100?'full':'')+'" data-w="'+bp.pct+'"></i></div><span class="arrow">'+(bp.done?'Continuer':'Commencer')+' &rarr;</span></div>';
+  }).join('');
+}
 function vSession(cid, n){
   var c = courseOf(cid);
   var ss = sessionsOf(cid), s = null;
@@ -454,13 +482,10 @@ function vSession(cid, n){
   + (fu
     ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
-  + setsOf(cid, s.key).map(function(sn){
-    var bp = setProgress(cid, s.key, sn);
-    var multi = setsOf(cid, s.key).length>1;
-    return '<div class="tile" data-go="#/q/'+cid+'/'+s.key+'/set'+sn+'"><span class="ic">'+IC.qcm+'</span><b>'+(multi?'QCM '+sn:'QCM')+'</b><span>'+bp.done+'/'+bp.total+' questions &middot; '+bp.acc+'% reussite</span><div class="bar"><i class="'+(bp.pct===100?'full':'')+'" data-w="'+bp.pct+'"></i></div><span class="arrow">'+(bp.done?'Continuer':'Commencer')+' &rarr;</span></div>';
-  }).join('')
+  + (levelBank(cid,s.key).length ? levelTiles(cid,s.key) : legacyTiles(cid,s.key))
   + '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>'
   + '</div>'
+  + (levelBank(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
   + (D.CHEATSHEET[cid] ? '<div class="card"><h2>Synthese du cours</h2><div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese '+c.code+'</b><span>toutes les formules et definitions du cours</span></div><span class="go">Lire</span></div></div>' : '');
 }
 function fcKnown(cid,n){ var cs=cards(cid,n), k=0; cs.forEach(function(c2){ if(store.fc[c2.id]==='known') k++; }); return k; }
@@ -471,18 +496,20 @@ function startQuiz(cid, n, src){
   var b;
   if(src==='dataset'){ b = (D.QCM_DATA[cid]||[]).slice(); }
   else if(n==null || n==='all'){ b = (D.QCM[cid]||[]).slice(); }
+  else if(/^level[1-3]$/.test(String(src))){ b = levelBank(cid,n,parseInt(String(src).slice(5),10)).slice(); }
   else if(/^set[0-9]+$/.test(String(src))){ b = bank(cid,n,parseInt(String(src).slice(3),10)).slice(); }
   else { b = bank(cid,n).slice(); }
   for(var i=b.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=b[i]; b[i]=b[j]; b[j]=t; }
   quiz = {cid:cid, n:n, src:src, bank:b, idx:0, answered:{}, sel:null, t0:Date.now(), ok:0};
 }
 function vQuiz(cid, n, src){
+  var isLevel = /^level[1-3]$/.test(String(src||''));
   var isSet = /^set[0-9]+$/.test(String(src||''));
-  if(n && n!=='all' && src!=='dataset' && !isSet && setsOf(cid,n).length>1){ location.replace('#/s/'+cid+'/'+n); return ''; }
+  if(n && n!=='all' && src!=='dataset' && !isSet && !isLevel && setsOf(cid,n).length>1){ location.replace('#/s/'+cid+'/'+n); return ''; }
   if(!quiz || quiz.cid!==cid || String(quiz.n)!==String(n) || (quiz.src||null)!==src) startQuiz(cid,n,src);
   var c = courseOf(cid);
   var backHash = (n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid;
-  var title = src==='dataset' ? 'QCM datasets R' : (isSet ? 'QCM '+String(src).slice(3)+' · Session '+n : (n && n!=='all' ? 'QCM · Session '+n : 'QCM blanc · '+c.name));
+  var title = isLevel ? levelLabel(parseInt(String(src).slice(5),10))+' · Session '+n : src==='dataset' ? 'QCM datasets R' : (isSet ? 'QCM '+String(src).slice(3)+' · Session '+n : (n && n!=='all' ? 'QCM · Session '+n : 'QCM blanc · '+c.name));
   if(!quiz.bank.length) return '<button class="back" data-go="'+backHash+'">&larr; Retour</button><div class="page-h">'+esc(title)+'</div><div class="card"><p style="font-size:13px;color:var(--muted)">Pas encore de questions pour cette session.</p></div>';
   if(quiz.idx >= quiz.bank.length) return vQuizDone(backHash, title);
   var q = quiz.bank[quiz.idx];
