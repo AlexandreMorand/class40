@@ -227,8 +227,8 @@ function ptExams(){ return ((D.PARTIELS||{}).exams||[]).slice().sort(function(a,
 function ptItem(id){ return ((D.PARTIELS||{}).items||{})[id] || null; }
 function ptDays(dateStr){ var d=new Date(dateStr); if(isNaN(d)) return null; return Math.ceil((d.getTime()-Date.now())/86400000); }
 function ptScores(){ try{ return JSON.parse(localStorage.getItem('c40-pt-v1')||'{}'); }catch(e){ return {}; } }
-function ptScore(id){ return ptScores()[id] || null; }
-function ptSaveScore(id, ok, total){ var s=ptScores(); s[id]={ok:ok,total:total,ts:Date.now()}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
+function ptScore(id){ var s=ptScores()[id] || null; if(s) s.stale=(s.revision||1)!==((ptItem(id)||{}).revision||1); return s; }
+function ptSaveScore(id, ok, total){ var s=ptScores(); s[id]={ok:ok,total:total,ts:Date.now(),revision:(ptItem(id)||{}).revision||1}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
 function ptTotal(){ return ptb ? ptb.item.mcq.length + ptb.item.open.length : 0; }
 function ptStart(id){ var it=ptItem(id); if(!it||it.type!=='blanc') return; ptb={itemId:id, item:it, idx:0, phase:'run', ans:{}, texts:{}}; render(); }
 function ptAnswer(i){ if(!ptb||ptb.phase!=='run') return; if(ptb.idx>=ptb.item.mcq.length) return; ptb.ans[ptb.idx]=i; render(); }
@@ -244,9 +244,9 @@ function vPartiels(){
       : (days!=null && days>=0 ? '<span class="pt-badge">J-'+days+'</span>' : '');
     var items = (ex.items||[]).map(function(iid){
       var it = ptItem(iid); if(!it) return '';
-      var det = it.type==='blanc' ? (it.mcq.length+' QCM + '+it.open.length+' ouvertes &middot; '+it.duration+' min') : 'Synthese des Must Know, session par session';
+      var det = it.type==='blanc' ? (it.mcq.length+' QCM + '+it.open.length+' ouvertes &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : 'Synthese des Must Know, session par session');
       var sc = it.type==='blanc' ? ptScore(it.id) : null;
-      var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+'</span>' : '<span class="pt-new">nouveau</span>';
+      var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
       return '<button class="pt-item" data-go="#/pt/'+it.id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
     }).join('');
     html += '<div class="card pt-exam"><div class="pt-exam-h"><span class="pt-code">'+esc(ex.code)+'</span><div class="pt-exam-t"><b>'+esc(ex.label)+'</b><span>'+esc(ex.name)+'</span></div>'+badge+'</div>'
@@ -260,6 +260,7 @@ function vPartiels(){
 function vPtItem(id){
   var it = ptItem(id);
   if(!it) return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">Introuvable</div><div class="card"><p style="font-size:13px;color:var(--muted)">Ce contenu n&#39;existe pas.</p></div>';
+  if(it.type==='official') return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div><div class="card"><p style="font-size:14px;line-height:1.7;margin-bottom:20px">'+esc(it.body)+'</p><div style="display:flex;flex-wrap:wrap;gap:12px">'+it.links.map(function(l){return '<a class="cta pri" href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.label)+'</a>';}).join('')+'</div><p style="font-size:12px;color:var(--muted);margin-top:16px">Si Blackboard demande une connexion, utilise ton compte Bocconi. Dossier du cours : Course Material, Module 1, Extra Exercises.</p></div>';
   if(it.type==='mustknow') return '<button class="back" data-go="#/pt">&larr; Partiels</button>'
     + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div>'
     + '<div class="card"><div class="md">'+mdLite(it.body)+'</div></div>';
@@ -431,6 +432,7 @@ function vHome(){
   + '<button class="stat" data-go="#/q/'+state.course+'"><b>'+accuracy()+'%</b><span>reussite moyenne</span><small>au premier essai</small></button>'
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
+  + '<div class="card" style="margin-bottom:18px"><h2>Préparer le partial de FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Accès Blackboard</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
   + courseChips(state.course)
   + '<div class="grid"><section class="card"><h2>'+esc(c.name)+' &middot; progression par session <button class="tag" data-go="#/c/'+c.id+'">Tout voir</button></h2>'
   + chapterRows(c.id, 5)
@@ -449,6 +451,7 @@ function vCourse(cid){
   var rows = chapterRows(cid);
   return courseChips(cid)
   + '<div class="page-h">'+esc(c.name)+'</div><div class="page-sub">'+esc(c.sub)+' &middot; '+p.done+'/'+p.total+' questions traitees ('+p.pct+'%)</div>'
+  + (cid==='fm' ? '<div class="card" style="margin-bottom:18px"><h2>Mock exam FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM à 3 options + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Blackboard · accès Bocconi requis</span></span><span class="pt-new">Ouvrir</span></button></div></div>' : '')
   + '<div class="grid"><section class="card"><h2>Sessions</h2>'+rows+'</section>'
   + '<aside><div class="card" style="margin-bottom:14px"><h2>Outils transverses</h2>'
   + '<div class="ch" data-go="#/q/'+cid+'"><span class="num">'+IC.qcm+'</span><div class="tx"><b>QCM blanc</b><span>toutes les sessions, ordre aleatoire</span></div><span class="go">Lancer</span></div>'
