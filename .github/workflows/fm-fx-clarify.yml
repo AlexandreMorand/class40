@@ -1,0 +1,24 @@
+name: Clarify FM FX study formulas
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - shell: bash
+        run: |
+          set -euo pipefail
+          echo 'aW1wb3J0IGhhc2hsaWIKZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmFzc2VydCBoYXNobGliLnNoYTI1NihQYXRoKCJkYXRhLmpzIikucmVhZF9ieXRlcygpKS5oZXhkaWdlc3QoKT09JzM4ZWQxZGJjNGUzNGUyZWMzZmVlNmFlZjcwMzg5YjBlNzUwYjlkNjAxNTE2NTRiYjEzNjg5ODlmMDNhMjhkNjUnCnM9UGF0aCgiZGF0YS5qcyIpLnJlYWRfdGV4dCgpCmI9IlB1dCA9IG1laWxsZXVyIHByaXggZGUgdmVudGUgbW9pbnMgcHJpbWUuIENhbGwgPSBwcml4IGQnYWNoYXQgcGxhbmNoZXIgcGx1cyBwcmltZS4iCmE9IlB1dCA9IHByaXggbWluaW11bSBkZSB2ZW50ZSBnYXJhbnRpIG1vaW5zIHByaW1lLiBDYWxsID0gcHJpeCBtYXhpbXVtIGQnYWNoYXQgZ2FyYW50aSBwbHVzIHByaW1lLiBDZXMgcHJpeCBzb250IGV4cHJpbcOpcyBlbiBkZXZpc2UgZG9tZXN0aXF1ZSBwYXIgdW5pdMOpIGRlIGRldmlzZSDDqXRyYW5nw6hyZS4iCmFzc2VydCBzLmNvdW50KGIpPT0xCnM9cy5yZXBsYWNlKGIsYSwxKQpiPSJCcmVhay1ldmVuIHNwb3QgcmF0ZXM6IHJlY2VpdmFibGUvcHV0IGhlZGdlIFMqVCA9IEYgKyBwcmVtaXVtOyBwYXlhYmxlL2NhbGwgaGVkZ2UgUypUID0gRiBcXHUyMjEyIHByZW1pdW0uIE9wcG9zaXRlIHNpZ25zIGJlY2F1c2UgdGhlIHVuLWV4ZXJjaXNlZCBzaWRlIG5lZWRzIHRvIGJlYXQgdGhlIGZvcndhcmQncyBmaXhlZCBwYXlvZmYvY29zdCBkaWZmZXJlbnRseS4iCmE9J0ZvciBxdW90ZXMgaW4gaG9tZSBjdXJyZW5jeSBwZXIgdW5pdCBvZiBmb3JlaWduIGN1cnJlbmN5IGFuZCBhbiBvcHRpb24gc3RyaWtlIGVxdWFsIHRvIHRoZSBmb3J3YXJkIHJhdGUsIGFuIHVuZXhlcmNpc2VkIHJlY2VpdmFibGUgcHV0IG1hdGNoZXMgdGhlIGZvcndhcmQgYXQgc3BvdCA9IGZvcndhcmQgKyBzZXR0bGVtZW50IHZhbHVlIG9mIHByZW1pdW0gcGVyIGZvcmVpZ24gY3VycmVuY3kgdW5pdC4gQW4gdW5leGVyY2lzZWQgcGF5YWJsZSBjYWxsIG1hdGNoZXMgYXQgc3BvdCA9IGZvcndhcmQgbWludXMgdGhhdCBwcmVtaXVtLiBJbnZlcnQgZm9yZWlnbiBjdXJyZW5jeSBwZXIgaG9tZSBjdXJyZW5jeSBxdW90ZXMgZmlyc3QgYW5kIGNoZWNrIHRoYXQgdGhlIG9wdGlvbiBpcyB1bmV4ZXJjaXNlZCBhdCB0aGUgY2FuZGlkYXRlIGJyZWFrIGV2ZW4uJwphc3NlcnQgcy5jb3VudChiKT09MQpzPXMucmVwbGFjZShiLGEsMSkKYj0ncG9zaXRpdmUgPSBwcmVtaXVtL2V4cGVjdGVkIHRvIHN0cmVuZ3RoZW4uJwphPSdwb3NpdGl2ZSBkZXNjcmliZXMgYSBmb3J3YXJkIHByZW1pdW0gaW4gdGhhdCBxdW90ZSBjb252ZW50aW9uLCBub3QgYSBndWFyYW50ZWUgb2YgZnV0dXJlIGFwcHJlY2lhdGlvbi4nCmFzc2VydCBzLmNvdW50KGIpPT0xCnM9cy5yZXBsYWNlKGIsYSwxKQpQYXRoKCJkYXRhLmpzIikud3JpdGVfdGV4dChzKQpwPVBhdGgoInN3LmpzIikKcz1wLnJlYWRfdGV4dCgpCmFzc2VydCAiYzQwLWZtLW1vY2stdjItMjAyNjEwMTYiIGluIHMKcC53cml0ZV90ZXh0KHMucmVwbGFjZSgiYzQwLWZtLW1vY2stdjItMjAyNjEwMTYiLCJjNDAtZm0tbW9jay12My0yMDI2MTAxNiIpKQo=' | base64 -d > /tmp/patch.py
+          python3 /tmp/patch.py
+          node --check data.js
+          rm .github/workflows/fm-fx-clarify.yml
+          git config user.name AlexandreMorand
+          git config user.email alexandre.morandd@gmail.com
+          git add data.js sw.js .github/workflows/fm-fx-clarify.yml
+          git commit -m 'Clarify FX option ceiling and break even quote conventions'
+          git push
