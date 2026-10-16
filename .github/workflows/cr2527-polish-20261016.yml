@@ -1,0 +1,34 @@
+name: Polish CR25 to CR27 answer spacing
+on:
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct answer spacing without changing questions or progression
+        run: |
+          cat > /tmp/patch.py <<'END-PATCH'
+          import json,hashlib
+          p='data.js';s=open(p).read();assert hashlib.sha256(s.encode()).hexdigest()=='1bb814de8ef6622fbe58ecee39d000bf7b2c767bbc6c4ce82d19024ba3b0cdcc'
+          d=json.loads(s[15:-2]);old=json.loads(s[15:-2]);fix={'OCIgain':'OCI gain','OCIloss':'OCI loss','P&Lexpense':'P&L expense','EPSfollow':'EPS follow','USrecognition':'US recognition','lessnew':'less new','lessfunding':'less funding','OCIrule':'OCI rule','Aunconditionally':'A unconditionally','forgrant':'for grant','pluscash':'plus cash','lesscapital':'less capital','givespremium':'gives premium'}
+          for n in ['25','26','27']:
+           for q in d['QCM_LEVELS']['cr'][n]:
+            for key in ['question','explanation','topic']:
+             for a,b in fix.items():q[key]=q[key].replace(a,b)
+            q['choices']=[__import__('functools').reduce(lambda x,p:x.replace(*p),fix.items(),v)for v in q['choices']]
+          target='"QCM_LEVELS":'+json.dumps(old['QCM_LEVELS'],ensure_ascii=False,separators=(',',':'));replacement='"QCM_LEVELS":'+json.dumps(d['QCM_LEVELS'],ensure_ascii=False,separators=(',',':'));assert s.count(target)==1
+          s=s.replace(target,replacement);assert json.loads(s[15:-2])==d
+          open(p,'w').write(s)
+          p='sw.js';s=open(p).read();assert "c40-fm-all-cr2527-levels-20261016"in s;s=s.replace('c40-fm-all-cr2527-levels-20261016','c40-fm-all-cr2527-polish-20261016',1);open(p,'w').write(s)
+          END-PATCH
+          python3 /tmp/patch.py
+          node --check data.js
+          git config user.name 'class40-bot'
+          git config user.email 'bot@class40.local'
+          git add data.js sw.js
+          git rm -q .github/workflows/cr2527-polish-20261016.yml
+          git commit -m 'Polish CR25 to CR27 answer spacing without changing IDs or scoring'
+          git push
