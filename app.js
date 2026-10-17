@@ -244,7 +244,7 @@ function vPartiels(){
       : (days!=null && days>=0 ? '<span class="pt-badge">J-'+days+'</span>' : '');
     var items = (ex.items||[]).map(function(iid){
       var it = ptItem(iid); if(!it) return '';
-      var det = it.type==='blanc' ? (it.mcq.length+' QCM + '+it.open.length+' ouvertes &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : 'Synthese des Must Know, session par session');
+      var det = it.type==='blanc' ? (it.mcq.length+' QCM'+(it.open.length?(' + '+it.open.length+' ouvertes'):'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : 'Synthese des Must Know, session par session');
       var sc = it.type==='blanc' ? ptScore(it.id) : null;
       var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
       return '<button class="pt-item" data-go="#/pt/'+it.id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
@@ -272,9 +272,9 @@ function vPtBlanc(it){
   if(ptb.phase==='intro'){
     return back + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">Partial Exam I &middot; format officiel</div>'
       + '<div class="qcard"><div class="pt-rules">'
-      + '<div>'+IC.clock+'<span>45 minutes &middot; pas de chrono impose ici, chronometre-toi</span></div>'
-      + '<div>'+IC.sheet+'<span>4 QCM a 3 options + 2 questions ouvertes a rediger</span></div>'
-      + '<div>'+IC.data+'<span>Closed book &middot; calculatrice scientifique &middot; corrige detaille devoile a la fin</span></div>'
+      + '<div>'+IC.clock+'<span>'+(it.duration||45)+' minutes &middot; pas de chrono impose ici, chronometre-toi</span></div>'
+      + '<div>'+IC.sheet+'<span>'+esc(it.formatNote||'4 QCM a 3 options + 2 questions ouvertes a rediger')+'</span></div>'
+      + '<div>'+IC.data+'<span>'+esc(it.materialNote||'Closed book &middot; calculatrice scientifique &middot; corrige detaille devoile a la fin')+'</span></div>'
       + '</div><p style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:18px">'+esc(it.intro)+'</p>'
       + '<button class="cta pri" data-act="ptstart" data-id="'+it.id+'">Commencer le partiel blanc</button></div>';
   }
@@ -282,7 +282,7 @@ function vPtBlanc(it){
     var h = back + '<div class="page-h">'+esc(it.title)+' &middot; corrige</div>'
       + '<div class="qcard" style="text-align:center;margin-bottom:16px"><div class="score-big">'+ptb.score.ok+' / '+ptb.score.total+'</div>'
       + '<p style="color:var(--muted);font-weight:600;margin:6px 0 4px">QCM &middot; corrige detaille ci-dessous</p>'
-      + '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p></div>';
+      + (ptb.item.open.length ? '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p>' : '') + '</div>';
     ptb.item.mcq.forEach(function(q, i){
       var mine = ptb.ans[i];
       var opts = q.choices.map(function(ch, j){
@@ -290,7 +290,7 @@ function vPtBlanc(it){
         if(j===q.correct) cls += ' right';
         else if(j===mine) cls += ' wrong';
         else cls += ' dim';
-        return '<div class="'+cls+'"><span class="k">'+'ABC'[j]+'</span><span>'+esc(ch)+'</span></div>';
+        return '<div class="'+cls+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(ch)+'</span></div>';
       }).join('');
       var verdict = (mine==null) ? '<span class="pt-badge soft">sans reponse</span>' : (mine===q.correct ? '<span class="pt-done">juste</span>' : '<span class="pt-wrong">faux</span>');
       h += '<div class="qcard" style="margin-bottom:14px"><div class="qmeta"><span>QCM '+(i+1)+' &middot; '+esc(q.session)+'</span><span style="margin-left:auto">'+verdict+'</span></div>'
@@ -309,7 +309,7 @@ function vPtBlanc(it){
   }
   var total = ptTotal(), isMcq = ptb.idx < it.mcq.length;
   var head = back + '<div class="page-h">'+esc(it.title)+'</div>'
-    + '<div class="qmeta" style="max-width:720px"><span>'+(ptb.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(ptb.idx/total*100)+'%"></i></div><span>45 min</span></div>';
+    + '<div class="qmeta" style="max-width:720px"><span>'+(ptb.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(ptb.idx/total*100)+'%"></i></div><span>'+(it.duration||45)+' min</span></div>';
   var foot = '<div class="qfoot">'
     + (ptb.idx>0 ? '<button class="cta line" data-act="ptprev">&larr; Precedente</button>' : '<span></span>')
     + (ptb.idx===total-1 ? '<button class="cta pri" data-act="ptfinish">Terminer et voir le corrige</button>' : '<button class="cta pri" data-act="ptnext">Suivante &rarr;</button>')
@@ -317,7 +317,7 @@ function vPtBlanc(it){
   if(isMcq){
     var q = it.mcq[ptb.idx], mine = ptb.ans[ptb.idx];
     var opts = q.choices.map(function(ch, j){
-      return '<button class="opt'+(j===mine?' sel':'')+'" data-act="ptans" data-i="'+j+'"><span class="k">'+'ABC'[j]+'</span><span>'+esc(ch)+'</span></button>';
+      return '<button class="opt'+(j===mine?' sel':'')+'" data-act="ptans" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(ch)+'</span></button>';
     }).join('');
     return head + '<div class="qcard"><div class="qmeta"><span>QCM '+(ptb.idx+1)+' &middot; '+esc(q.session)+'</span></div><div class="qq">'+esc(q.q)+'</div>'+opts+foot+'</div>';
   }
