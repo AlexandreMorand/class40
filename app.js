@@ -274,7 +274,7 @@ function vPtBlanc(it){
       + '<div class="qcard"><div class="pt-rules">'
       + '<div>'+IC.clock+'<span>'+(it.duration||45)+' minutes &middot; pas de chrono impose ici, chronometre-toi</span></div>'
       + '<div>'+IC.sheet+'<span>'+esc(it.formatNote||'4 QCM a 3 options + 2 questions ouvertes a rediger')+'</span></div>'
-      + '<div>'+IC.data+'<span>'+esc(it.materialNote||'Closed book &middot; calculatrice scientifique &middot; corrige detaille devoile a la fin')+'</span></div>'
+      + '<div>'+IC.data+'<span>'+esc(it.materialNote||'Closed book · calculatrice scientifique · corrige detaille devoile a la fin')+'</span></div>'
       + '</div><p style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:18px">'+esc(it.intro)+'</p>'
       + '<button class="cta pri" data-act="ptstart" data-id="'+it.id+'">Commencer le partiel blanc</button></div>';
   }
