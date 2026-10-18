@@ -244,9 +244,10 @@ function vPartiels(){
       : (days!=null && days>=0 ? '<span class="pt-badge">J-'+days+'</span>' : '');
     var items = (ex.items||[]).map(function(iid){
       var it = ptItem(iid); if(!it) return '';
-      var det = it.type==='blanc' ? (it.mcq.length+' QCM'+(it.open.length?(' + '+it.open.length+' ouvertes'):'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : 'Synthese des Must Know, session par session');
+      var det = it.type==='blanc' ? (it.mcq.length+' QCM'+(it.open.length?(' + '+it.open.length+' ouvertes'):'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : (it.det ? esc(it.det) : 'Synthese des Must Know, session par session'));
       var sc = it.type==='blanc' ? ptScore(it.id) : null;
       var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
+      if(it.url) return '<a class="pt-item" style="text-decoration:none" href="'+esc(it.url)+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+(it.badge?'<span class="pt-new">'+esc(it.badge)+'</span>':'')+'</a>';
       return '<button class="pt-item" data-go="#/pt/'+it.id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
     }).join('');
     html += '<div class="card pt-exam"><div class="pt-exam-h"><span class="pt-code">'+esc(ex.code)+'</span><div class="pt-exam-t"><b>'+esc(ex.label)+'</b><span>'+esc(ex.name)+'</span></div>'+badge+'</div>'
@@ -263,6 +264,7 @@ function vPtItem(id){
   if(it.type==='official') return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div><div class="card"><p style="font-size:14px;line-height:1.7;margin-bottom:20px">'+esc(it.body)+'</p><div style="display:flex;flex-wrap:wrap;gap:12px">'+it.links.map(function(l){return '<a class="cta pri" href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.label)+'</a>';}).join('')+'</div><p style="font-size:12px;color:var(--muted);margin-top:16px">Si Blackboard demande une connexion, utilise ton compte Bocconi. Dossier du cours : Course Material, Module 1, Extra Exercises.</p></div>';
   if(it.type==='mustknow') return '<button class="back" data-go="#/pt">&larr; Partiels</button>'
     + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div>'
+    + (it.url ? '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px"><a class="cta pri" href="'+esc(it.url)+'">Ouvrir la fiche</a>'+(it.pdf?'<a class="cta line" href="'+esc(it.pdf)+'" download>Télécharger le PDF</a>':'')+'</div>' : '')
     + '<div class="card"><div class="md">'+mdLite(it.body)+'</div></div>';
   return vPtBlanc(it);
 }
