@@ -210,6 +210,7 @@ function parseHash(){
   if(!p.length) return {page:'home'};
   if(p[0]==='c'&&p[1]) return {page:'course', course:p[1]};
   if(p[0]==='s'&&p[1]&&p[2]!=null) return {page:'session', course:p[1], n:p[2]};
+  if(p[0]==='qb') return p[1]==='play' ? {page:'qplay'} : {page:'qbuilder'};
   if(p[0]==='q'&&p[1]) return {page:'quiz', course:p[1], n:p[2]||null, src:p[3]||null};
   if(p[0]==='f'&&p[1]) return {page:'flash', course:p[1], n:p[2]||null};
   if(p[0]==='cs'&&p[1]) return {page:'cheat', course:p[1]};
@@ -358,14 +359,14 @@ var root = $('#c40root');
 var navDef = [
   {page:'home', hash:'#/', label:'Accueil', icon:IC.home},
   {page:'course', hash:'#/c/cr', label:'Parcours', icon:IC.grid},
-  {page:'quiz', hash:'#/q/cr', label:'QCM', icon:IC.qcm},
+  {page:'quiz', hash:'#/qb', label:'QCM', icon:IC.qcm},
   {page:'flash', hash:'#/f/cr', label:'Flashcards', icon:IC.card},
   {page:'partiels', hash:'#/pt', label:'Partiels', icon:IC.clock},
   {page:'deadlines', hash:'#/dl', label:'Echeances', icon:IC.cal}
 ];
 function navHTML(r){
   return navDef.map(function(n){
-    var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat')) || (n.page==='quiz' && r.page==='quiz') || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
+    var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat')) || (n.page==='quiz' && (r.page==='quiz'||r.page==='qbuilder'||r.page==='qplay')) || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
     if(n.page==='partiels' && (r.page==='partiels'||r.page==='ptitem')) on = true;
     if(n.page==='home' && r.page==='home') on = true;
     if(n.page==='deadlines' && r.page==='deadlines') on = true;
@@ -559,6 +560,125 @@ function answerQuiz(i){
   render();
 }
 
+
+/* ---------- QCM A LA CARTE (builder) ---------- */
+var qb = {course:'fm', session:'all', level:0, count:'15'};
+function qbHasLevels(cid){
+  var g=(D.QCM_LEVELS||{})[cid]||{};
+  return Object.keys(g).some(function(k){ return (g[k]||[]).length>0; });
+}
+function qbSessions(cid){
+  var ss=sessionsOf(cid);
+  return ss.filter(function(s){ return bank(cid,s.key).length>0 || levelBank(cid,s.key).length>0; });
+}
+function qbPool(cid, skey, level){
+  var keys = skey==='all' ? qbSessions(cid).map(function(s){return s.key;}) : [skey];
+  var pool=[], seen={};
+  keys.forEach(function(k){
+    var items;
+    if(level){ items = levelBank(cid,k,level); }
+    else { items = bank(cid,k).concat(levelBank(cid,k)); }
+    items.forEach(function(q){ if(!seen[q.id]){ seen[q.id]=1; pool.push(q); } });
+  });
+  return pool;
+}
+function qbSet(k, v){
+  if(k==='course'){ qb.course=v; qb.session='all'; qb.level=0; }
+  else if(k==='session'){ qb.session=v; }
+  else if(k==='level'){ qb.level=parseInt(v,10)||0; }
+  else if(k==='count'){ qb.count=v; }
+  render();
+}
+function qbRow(label, inner){
+  return '<div style="margin:14px 0"><div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px">'+label+'</div><div style="display:flex;flex-wrap:wrap;gap:8px">'+inner+'</div></div>';
+}
+function qbBtn(act,k,v,label,on,dis){
+  return '<button class="cta '+(on?'pri':'line')+'" style="padding:9px 14px;font-size:12.5px" data-act="'+act+'" data-k="'+k+'" data-v="'+esc(v)+'"'+(dis?' disabled style="padding:9px 14px;font-size:12.5px;opacity:.45"':'')+'>'+esc(label)+'</button>';
+}
+function vQBuilder(){
+  var cid=qb.course, c=courseOf(cid);
+  var cBtn=COURSES.map(function(cc){ return qbBtn('qbset','course',cc.id,cc.name,qb.course===cc.id,false); }).join('');
+  var sBtns=qbBtn('qbset','session','all','Toutes les sessions',qb.session==='all',false);
+  qbSessions(cid).forEach(function(s){ sBtns+=qbBtn('qbset','session',s.key,'Session '+s.n,qb.session===s.key,false); });
+  var lvlBtns='', lvlNote='';
+  if(qbHasLevels(cid)){
+    lvlBtns=qbBtn('qbset','level','0','Toutes',qb.level===0,false)
+      +qbBtn('qbset','level','1','Medium',qb.level===1,false)
+      +qbBtn('qbset','level','2','Difficile',qb.level===2,false)
+      +qbBtn('qbset','level','3','Expert',qb.level===3,false);
+  } else {
+    lvlNote='<div style="font-size:12px;color:var(--muted)">Pas encore de niveaux calibrés pour cette matière, toutes les questions sont mélangées.</div>';
+  }
+  var counts=['10','15','20','30','all'];
+  var cLabels={'10':'10','15':'15','20':'20','30':'30','all':'Tout'};
+  var cntBtns=counts.map(function(x){ return qbBtn('qbset','count',x,cLabels[x],qb.count===x,false); }).join('');
+  var pool=qbPool(cid, qb.session, qb.level);
+  var avail=pool.length;
+  var n = qb.count==='all' ? avail : Math.min(parseInt(qb.count,10), avail);
+  var launch = avail>0
+    ? '<button class="cta pri" style="margin-top:6px;font-size:14px;padding:13px 22px" data-act="qblaunch">Lancer le QCM · '+n+' question'+(n>1?'s':'')+'</button>'
+    : '<div style="font-size:13px;color:var(--muted);margin-top:6px">Aucune question pour ce réglage, élargis la sélection.</div>';
+  return '<button class="back" data-go="#/">&larr; Accueil</button>'
+    + '<div class="page-h">QCM à la carte</div>'
+    + '<div class="page-sub">Choisis la matière, le thème, la difficulté et la longueur. Le tirage est mélangé à chaque lancement et chaque réponse compte dans ta progression.</div>'
+    + '<div class="card">'
+    + qbRow('Matière', cBtn)
+    + qbRow('Thème', sBtns)
+    + qbRow('Difficulté', lvlBtns||'') + lvlNote
+    + qbRow('Longueur', cntBtns)
+    + '<div style="font-size:12.5px;color:var(--muted);margin-top:4px">'+avail+' question'+(avail>1?'s':'')+' disponible'+(avail>1?'s':'')+' pour ce réglage.</div>'
+    + launch
+    + '</div>';
+}
+function startCustomQuiz(retry){
+  if(!retry || !quiz || quiz.src!=='custom'){ var params={course:qb.course, session:qb.session, level:qb.level, count:qb.count}; }
+  else { var params=quiz.custom; qb.course=params.course; qb.session=params.session; qb.level=params.level; qb.count=params.count; }
+  var pool=qbPool(params.course, params.session, params.level).slice();
+  for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+  if(params.count!=='all') pool=pool.slice(0, parseInt(params.count,10));
+  if(!pool.length){ go('#/qb'); return; }
+  quiz = {cid:params.course, n:'custom', src:'custom', bank:pool, idx:0, answered:{}, sel:null, t0:Date.now(), ok:0, custom:params};
+  go('#/qb/play');
+}
+function qbTitle(){
+  var p=quiz.custom, parts=[courseOf(p.course).name];
+  if(p.session!=='all') parts.push('Session '+p.session);
+  else parts.push('toutes sessions');
+  if(p.level) parts.push(levelLabel(p.level));
+  return 'QCM à la carte · '+parts.join(' · ');
+}
+function vQPlay(){
+  if(!quiz || quiz.src!=='custom' || !quiz.bank.length){ location.replace('#/qb'); return ''; }
+  var backHash='#/qb', title=qbTitle();
+  if(quiz.idx >= quiz.bank.length){
+    var total=quiz.bank.length, ok=quiz.ok, pct=Math.round(ok/total*100);
+    return '<button class="back" data-go="'+backHash+'">&larr; Réglages</button>'
+      + '<div class="page-h">'+esc(title)+' · score</div>'
+      + '<div class="qcard" style="text-align:center;padding:34px 20px"><div style="font-size:44px;font-weight:900">'+ok+' / '+total+'</div><div style="color:var(--muted);font-weight:700;margin:6px 0 18px">'+pct+'% de réussite</div>'
+      + '<button class="cta pri" data-act="qbretry">Nouveau tirage, mêmes réglages</button> <button class="cta line" data-go="#/qb">Modifier les réglages</button></div>';
+  }
+  var q = quiz.bank[quiz.idx];
+  var ans = quiz.answered[q.id];
+  var total = quiz.bank.length;
+  var opts = q.choices.map(function(ch,i){
+    var cls = 'opt', dis = '';
+    if(ans){
+      if(i===q.correct_index) cls += ' right';
+      else if(i===ans.choice) cls += ' wrong';
+      else cls += ' dim';
+    }
+    return '<button class="'+cls+'" data-act="ans" data-i="'+i+'"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></button>';
+  }).join('');
+  var expl = (ans && q.explanation) ? '<div class="expl"><b>Pourquoi :</b> '+esc(q.explanation)+'</div>' : '';
+  var foot = ans
+    ? '<button class="cta line" data-act="qprev">&larr; Precedente</button><button class="cta pri" data-act="qnext">'+(quiz.idx===total-1?'Voir le score':'Suivante &rarr;')+'</button>'
+    : '<span style="font-size:11.5px;color:var(--muted);font-weight:600">Choisis une reponse</span><button class="cta line" data-act="qskip">Passer &rarr;</button>';
+  return '<button class="back" data-go="'+backHash+'">&larr; Réglages</button>'
+  + '<div class="page-h">'+esc(title)+'</div>'
+  + '<div class="qcard"><div class="qmeta"><span>'+(quiz.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(quiz.idx/total*100)+'%"></i></div><span>'+quiz.ok+' bonnes</span></div>'
+  + '<div class="qq">'+esc(q.question)+'</div>'+opts+expl+'<div class="qfoot">'+foot+'</div></div>';
+}
+
 /* ---------- FLASHCARDS ---------- */
 var fc = null;
 function startFc(cid, n){
@@ -704,6 +824,8 @@ function render(){
     case 'course': content = vCourse(r.course); break;
     case 'session': content = vSession(r.course, r.n); break;
     case 'quiz': content = vQuiz(r.course, r.n, r.src); break;
+    case 'qbuilder': content = vQBuilder(); break;
+    case 'qplay': content = vQPlay(); break;
     case 'flash': content = vFlash(r.course, r.n); break;
     case 'cheat': content = vCheat(r.course); break;
     case 'deadlines': content = vDeadlines(); break;
@@ -731,6 +853,9 @@ document.addEventListener('click', function(e){
     if(act==='search'){ openSearch(); return; }
     if(act==='fiche'){ store.fiches[a.getAttribute('data-cid')+'-'+a.getAttribute('data-n')] = true; save(); return; /* laisse le lien s'ouvrir */ }
     if(act==='ans'){ answerQuiz(parseInt(a.getAttribute('data-i'),10)); return; }
+    if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
+    if(act==='qblaunch'){ startCustomQuiz(); return; }
+    if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
