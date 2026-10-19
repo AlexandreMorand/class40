@@ -638,7 +638,7 @@ function startCustomQuiz(retry){
   if(params.count!=='all') pool=pool.slice(0, parseInt(params.count,10));
   if(!pool.length){ go('#/qb'); return; }
   quiz = {cid:params.course, n:'custom', src:'custom', bank:pool, idx:0, answered:{}, sel:null, t0:Date.now(), ok:0, custom:params};
-  go('#/qb/play');
+  if(location.hash==='#/qb/play') render(); else go('#/qb/play');
 }
 function qbTitle(){
   var p=quiz.custom, parts=[courseOf(p.course).name];
