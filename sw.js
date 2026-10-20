@@ -50,3 +50,5 @@ self.addEventListener('fetch',e=>{
     return r;
   })));
 });
+
+// CR credibility revision published 20 October 2026.
