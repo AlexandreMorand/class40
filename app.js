@@ -217,6 +217,7 @@ function parseHash(){
   if(p[0]==='dl') return {page:'deadlines'};
   if(p[0]==='pt'&&p[1]) return {page:'ptitem', item:p[1]};
   if(p[0]==='pt') return {page:'partiels'};
+  if(p[0]==='moy') return {page:'moyennes'};
   return {page:'home'};
 }
 function go(h){ location.hash = h; }
@@ -354,6 +355,84 @@ function dlWhen(dateStr){
   return {b:String(d.getDate()), s:DL_MONTHS[d.getMonth()]};
 }
 
+
+/* ---------- MOYENNES ---------- */
+var MOYKEY = 'c40-moy-v1';
+function moyCourses(){ return (D.MOYENNES && D.MOYENNES.courses) || []; }
+function moyState(){ try{ return JSON.parse(localStorage.getItem(MOYKEY)||'{}'); }catch(e){ return {}; } }
+function moySave(st){ try{ localStorage.setItem(MOYKEY, JSON.stringify(st)); }catch(e){} }
+function moyGet(cid, eid){ var st = moyState(); var v = st[cid] && st[cid][eid]; return (typeof v === 'number' && isFinite(v)) ? v : null; }
+function moySet(cid, eid, val){ var st = moyState(); if(!st[cid]) st[cid] = {}; if(val==null) delete st[cid][eid]; else st[cid][eid] = val; moySave(st); }
+function moyFmt(x){ var v = Math.round(x*10)/10; return (v===Math.floor(v)) ? String(v) : v.toFixed(1); }
+function moyCompute(c){
+  var entered = 0;
+  if(c.kind==='weighted'){
+    var sw=0, sg=0;
+    c.evals.forEach(function(e){ var g=moyGet(c.id,e.id); if(g!=null){ sw+=e.coef; sg+=g*e.coef; entered++; } });
+    if(!entered) return null;
+    return {main:'Moyenne en cours : '+moyFmt(sg/sw)+' / 30', sub:'sur '+sw+'% du cours saisi (coefficients : '+c.evals.map(function(e){return e.coef+'%';}).join(' + ')+')'};
+  }
+  if(c.kind==='points'){
+    var tot=0, mx=0, full=0;
+    c.evals.forEach(function(e){ full+=e.pts; var g=moyGet(c.id,e.id); if(g!=null){ tot+=g; entered++; } });
+    if(!entered) return null;
+    return {main:'Total en cours : '+moyFmt(tot)+' / '+full, sub:'sur les épreuves saisies'};
+  }
+  if(c.kind==='da'){
+    var S=moyGet(c.id,'da-s'), M=moyGet(c.id,'da-m'), T=moyGet(c.id,'da-t')||0;
+    if(S==null && M==null) return null;
+    S=S||0; M=M||0;
+    var avec=S+M+T, sans=22/18*S+M, v=Math.max(avec,sans);
+    return {main:'Note finale estimée : '+moyFmt(v)+' / 31', sub:'avec tests '+moyFmt(avec)+', sans tests '+moyFmt(sans)+', la meilleure des deux compte (T = '+moyFmt(T)+' saisi)'};
+  }
+  return null;
+}
+function vMoyennes(){
+  var h = '<button class="back" data-go="#/">&larr; Accueil</button><div class="page-h">Mes moyennes</div><div class="page-sub">Tes notes restent sur cet appareil, rien n&#39;est envoyé en ligne.</div>';
+  moyCourses().forEach(function(c){
+    h += '<div class="card" style="margin-bottom:18px"><h2>'+esc(c.name)+'</h2>';
+    if(c.info) h += '<p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.55">'+esc(c.info)+'</p>';
+    c.evals.forEach(function(e){
+      var g = moyGet(c.id, e.id);
+      var right = (c.kind==='weighted') ? ('coef '+e.coef+'% &middot; note / '+e.max) : ('note / '+e.pts);
+      var mx = (c.kind==='weighted') ? e.max : e.pts;
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line,#e5e5e5)">'
+        + '<span style="flex:1;font-size:13.5px;font-weight:600">'+esc(e.name)+'<br><small style="font-weight:500;color:var(--muted)">'+right+'</small></span>'
+        + '<input class="moy-in" data-c="'+c.id+'" data-e="'+e.id+'" type="number" min="0" max="'+mx+'" step="0.5" inputmode="decimal" placeholder="&ndash;" value="'+(g==null?'':g)+'" style="width:76px;padding:8px 10px;font-size:15px;text-align:center;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--bg,#fff);color:inherit">'
+        + '</div>';
+    });
+    var res = moyCompute(c);
+    h += '<div id="moy-res-'+c.id+'" style="margin-top:12px;font-size:14px;font-weight:700">'+(res?res.main:'Aucune note saisie pour l&#39;instant.')+'</div>';
+    h += '<div id="moy-sub-'+c.id+'" style="font-size:12px;color:var(--muted);margin-top:2px">'+(res?res.sub:'')+'</div>';
+    h += '</div>';
+  });
+  return h;
+}
+function moyBind(){
+  $$('.moy-in').forEach(function(inp){
+    inp.addEventListener('input', function(){
+      var cid = inp.getAttribute('data-c'), eid = inp.getAttribute('data-e');
+      var raw = inp.value.trim();
+      var c = null; moyCourses().forEach(function(x){ if(x.id===cid) c=x; });
+      if(!c) return;
+      var ev = null; c.evals.forEach(function(x){ if(x.id===eid) ev=x; });
+      if(!ev) return;
+      if(raw===''){ moySet(cid, eid, null); }
+      else {
+        var v = parseFloat(raw.replace(',','.'));
+        if(isNaN(v)) return;
+        var mx = (c.kind==='weighted') ? ev.max : ev.pts;
+        if(v<0) v=0; if(v>mx) v=mx;
+        moySet(cid, eid, v);
+      }
+      var res = moyCompute(c);
+      var r1 = document.getElementById('moy-res-'+cid), r2 = document.getElementById('moy-sub-'+cid);
+      if(r1) r1.textContent = res ? res.main : 'Aucune note saisie pour l\u2019instant.';
+      if(r2) r2.textContent = res ? res.sub : '';
+    });
+  });
+}
+
 /* ---------- RENDER SHELL ---------- */
 var root = $('#c40root');
 var navDef = [
@@ -436,6 +515,7 @@ function vHome(){
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
   + '<div class="card" style="margin-bottom:18px"><h2>Préparer le partial de FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Accès Blackboard</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
+  + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
   + courseChips(state.course)
   + '<div class="grid"><section class="card"><h2>'+esc(c.name)+' &middot; progression par session <button class="tag" data-go="#/c/'+c.id+'">Tout voir</button></h2>'
   + chapterRows(c.id, 5)
@@ -831,6 +911,7 @@ function render(){
     case 'deadlines': content = vDeadlines(); break;
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
+    case 'moyennes': content = vMoyennes(); break;
     default: content = vHome();
   }
   root.innerHTML = shell(content, r);
@@ -839,6 +920,7 @@ function render(){
     var ring = $('#heroRing');
     if(ring){ var g = globalProgress(), circ = 2*Math.PI*48; ring.style.transition = 'stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)'; ring.style.strokeDashoffset = String(circ*(1-g.pct/100)); }
     updateNet();
+    if(r.page==='moyennes') moyBind();
   });
 }
 function updateNet(){ var d = $('#netdot'); if(d) d.classList.toggle('off', !navigator.onLine); }
