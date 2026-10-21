@@ -226,7 +226,7 @@ window.addEventListener('hashchange', render);
 var ptb = null;
 function ptExams(){ return ((D.PARTIELS||{}).exams||[]).slice().sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); }); }
 function ptItem(id){ return ((D.PARTIELS||{}).items||{})[id] || null; }
-function ptDays(dateStr){ var d=new Date(dateStr); if(isNaN(d)) return null; return Math.ceil((d.getTime()-Date.now())/86400000); }
+function ptDays(dateStr){ var d=new Date(dateStr); if(isNaN(d)) return null; var now=new Date(); if(d.getTime()<now.getTime()) return -1; var a=new Date(d.getFullYear(),d.getMonth(),d.getDate()), c=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return Math.round((a-c)/86400000); }
 function ptScores(){ try{ return JSON.parse(localStorage.getItem('c40-pt-v1')||'{}'); }catch(e){ return {}; } }
 function ptScore(id){ var s=ptScores()[id] || null; if(s) s.stale=(s.revision||1)!==((ptItem(id)||{}).revision||1); return s; }
 function ptSaveScore(id, ok, total){ var s=ptScores(); s[id]={ok:ok,total:total,ts:Date.now(),revision:(ptItem(id)||{}).revision||1}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
@@ -242,7 +242,7 @@ function vPartiels(){
     var days = ptDays(ex.date);
     var badge = ex.kind==='exercise'
       ? '<span class="pt-badge soft">seance d&#39;exercices</span>'
-      : (days!=null && days>=0 ? '<span class="pt-badge">J-'+days+'</span>' : '');
+      : (days!=null && days>=0 ? '<span class="pt-badge">'+(days===0?"aujourd&#39;hui":'J-'+days)+'</span>' : (days!=null ? '<span class="pt-badge soft">passe</span>' : ''));
     var items = (ex.items||[]).map(function(iid){
       var it = ptItem(iid); if(!it) return '';
       var det = it.type==='blanc' ? (it.mcq.length+' QCM'+(it.open.length?(' + '+it.open.length+' ouvertes'):'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : (it.det ? esc(it.det) : 'Synthese des Must Know, session par session'));
