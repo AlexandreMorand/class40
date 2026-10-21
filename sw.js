@@ -1,4 +1,4 @@
-const CACHE='c40-cr-structure-20261020';
+const CACHE='c40-cr-mocks-20261021';
 const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','fiches/fm-mock-methode.html?v=20261018','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
