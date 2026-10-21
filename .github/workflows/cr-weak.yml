@@ -1,0 +1,52 @@
+name: CR weak option correction
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  revise:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply checked CR level corrections
+        run: |
+          python3 - <<'PY'
+          import json,re,pathlib,hashlib,base64,zlib
+          p=pathlib.Path('data.js');s=p.read_text();orig=s
+          assert hashlib.sha256(s.encode()).hexdigest()=='fa17d870241ea53552f920a6fafc747f8c633eb36a2a2f3f32b52098a1e36120'
+          patch=json.loads(zlib.decompress(base64.b64decode('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')))
+          dec=json.JSONDecoder()
+          for k,q,ch in patch:
+              tok='{"id":'+json.dumps(k)+','
+              assert s.count(tok)==1,k
+              st=s.index(tok)
+              qa=s.index('"question":',st)+11;oq,ql=dec.raw_decode(s[qa:])
+              ca=s.index('"choices":',st)+10;oc,cl=dec.raw_decode(s[ca:]);assert len(oc)==4 and len(ch)==4 and qa<ca and ca-qa<3000
+              nq=json.dumps(q,ensure_ascii=True,separators=(',',':'));nc=json.dumps(ch,ensure_ascii=True,separators=(',',':'))
+              s=s[:ca]+nc+s[ca+cl:]
+              s=s[:qa]+nq+s[qa+ql:]
+          b=json.loads(s[len('window.C40DATA='):].strip().rstrip(';'));o=json.loads(orig[len('window.C40DATA='):].strip().rstrip(';'))
+          ids={x[0] for x in patch}
+          def walk(x,y):
+              if isinstance(x,dict):
+                  assert x.keys()==y.keys()
+                  if x.get('id') in ids:
+                      for kk in x:
+                          if kk not in('choices','question'): assert x[kk]==y[kk],kk
+                      return 1
+                  return sum(walk(x[kk],y[kk]) for kk in x)
+              if isinstance(x,list):
+                  assert len(x)==len(y);return sum(walk(i,j) for i,j in zip(x,y))
+              assert x==y;return 0
+          n=walk(o,b);assert n==len(patch),n
+          p.write_text(s)
+          sw=pathlib.Path('sw.js');t=sw.read_text();assert 'c40-cr-levels-20261021' in t
+          sw.write_text(t.replace('c40-cr-levels-20261021','c40-cr-weak-20261021'))
+          print(len(patch),hashlib.sha256(s.encode()).hexdigest())
+          PY
+          rm .github/workflows/cr-weak.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data.js sw.js .github/workflows/cr-weak.yml
+          git commit -m 'Rebalance CR weak options'
+          git push
