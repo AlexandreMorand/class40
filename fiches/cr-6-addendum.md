@@ -1,4 +1,4 @@
-# Addendum — Transaction costs at initial recognition (Review Session IA)
+# Addendum: transaction costs at initial recognition (Review Session IA)
 
 The fiche covers initial measurement at fair value but not the treatment of transaction costs, which the review tests explicitly.
 
