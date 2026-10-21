@@ -1,0 +1,51 @@
+name: CG choices option correction
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  revise:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply checked CR level corrections
+        run: |
+          python3 - <<'PY'
+          import json,re,pathlib,hashlib,base64,zlib
+          p=pathlib.Path('data.js');s=p.read_text();orig=s
+          assert hashlib.sha256(s.encode()).hexdigest()=='1d78efba65b95e3acf6a021d82e3f728ace52d4f830fe06258d2846997ae7819'
+          patch=json.loads(zlib.decompress(base64.b64decode(open('/tmp/cr8/patch.b64').read() if False else 'eNp9WtuOG8cR/ZXGAokSgKtotb7pKZBlIXYQWYFlwA+2H5ozzWFrh9Oj7hly+fc5p6p7LuRuHgwvyenqup46VaPff7+pmtt0d/vlzc3G3Lw1VeiGGNrWd43Z2YNvzyb5IZnQmWHvzDbYWBvb1cZ35mA727iD6wYTdsaanY8Hc/LD3gQ8G00Yh+RrZ9LeRrcPbe1iemm+d/wyibiqtSn5avmECFfJ0fQxbFt32JjT3ld7KrdrfTWYLpzwzDBA4D+h9+8376Kr/RBiMraxvkvD6lITjhAWfXo4G1zo8Ou4TYMfxsHDMLuDINO6robVdMMH+zlEP5zXQorkg++e+FWusK1vuuIQ30GsS0MSz44X+s3elJP8mKrQO57EBw99XR/iwEDU0NOJmB986nGbq82lVrbDhbV7NLuxyzL38NIxDPA19DSVTcPNnxtz9ycdxqjf3365o9Df1Ll72zVQAt5530W6pbdxMLsYDojtEC0MgLdsa1znYnM2UKqFGzQAP8EvuLTW5+VpKA4XBAaxHiue3ZjteOb3hwCF+nBiiFvbIb8Y9cYm0/veIfnU2rXQWY7KzZdsTAWHI/7MUbjEH+3gj05F7nxnu8qL0g3E4mcN8aVonnIGUj8N/COcYGPa+76kXnLVyDuqvbM9syXADMT3UK6YxNYx9D2enJ+QmrJVtjLCPlU29QGZaFsWQ8D3sM4ZFlsVDgc/MI/SVcS+niPmHuk8Kx6pQympMCI/TAMXmF2IZmu7h4RS9lLSuKcOxtbuy0gz6xH/4ZfGdbgaYiTyL5L59N/3ubLemji2SFUbaX6WRp+5R8BDJ0L3zNrd7dZCncrdpr1DEh0dlKRtgg0VjEZZwLLedmfa8CsLQMQ5GztGwrm0McheqRqP+nb0Vj8ONiceK1jDaiu6sLdfYEAaItIC0dFCi8N+jOYtxSTXmb1F0BzqaEevU1XaVsLausa2wDhc04pMxLeCStuzFij1Wyu7d20N/KHzQ8KldGmuFyiWAgJ64u/R2UTQDEiE8AD7Q3K4yA4SYeqwDu1X395++Y5XibCNwY3RdkFz5rcQ2/odC7FtxSIL+MsYBfcWoK19dBVR5qX5bY+bLpMCiVi1Y+1yycJFPUCPcZlOmmg9nuQh8TakM3dg6IbGEeITgC+M8EIf3Q6lAPjxBO5JhhTCJJw5nUznKpeSjWdAAPGbELzb+YpZAVhwlR1xbe9Cj2SjyYqNADOpeEHByJx2ux1uwV/AiCk0fnlbZLrwTomgYy/AcYjt2SSoIa1S+SgDYpixVQwpqXkU+lE9GoubAb+i5MFJcSKwoWM0pXO8fvXqO9G59rWY5h49EVlAHlap0/B3dx3yu1cK65P74SeaKeLRHQeqGHELihIAuPNAZN8w2REPRo5GOniDHtq6HYGVXx1QgviKicA8jyh43CGtidGAkgc3lDzAqYPCSI4sbMwqKJxD4Lv3HyUDBkmsK31tcTIaT4IkzYErwVvH9onabjc8UC1yVjqPdj6gL/oa4mnFrRZ5eIL3kESudvXzogEaqLGNoEzrBjfhrQWL4NdHwX98lcZ2SGxHdeMyLgNGgDjN+RnxcnjRT7IM8VKxpYiALkR/gfUFSbL40jEFXq9T4PXiyrZELmWWNbW8A8LPhgX333/98pu/SGlKZgnlQv93j8gT4qStjz4FpVJfvbz7izwBkICybg0NXor5lKFejyXo/OCIYbVHsUUWVbFwC2ZXVBGbaLDyixZsA6TQblNoR/ZSl2tpEps7nPIaWLKQk2YMQAqc6Wc2BBIEn9KoHXLnH1fy9PmlNrgftQCQgUJW0lU/CjPNgdwj4eit7KSVRNznyBADQkwNxbN735DNXlm9mdzKH5hXohADfL8O8P3cswVUL3F519pGm7WAEhrF7pY8NSXxjUbnV/qFji6t+Gx+GoBeMKVFy+FxdocW0OPq3Gh9pkFaViK9YKbKEiIWfRNiGKnSMouiO3p3mgTEDC4hQHgaiA248oA/Z9gUuazSNaPv6SBIzPg0l3yF+xAp7ctTRe3yR15PqZ/gD7PwhxxDuwYXMECJEbwO2vhFO0sjORr5Kx0wkOnXTwXm2zkwGEmq6HuptZ0XTFiJLErnUunO0zfApqAhJazS5gKYoLjJZ8Ka4y30x+AQr+AU4mtvY2b3byGhu3WP4JrscPMN1T6Qy2RWspzRln4WEokmJ32B8tcTyHPCJcm7MGPbRjoNvK2sC49w5pC/pRFabcG4/TPwkyER+Uyd54XrLCnnyd2zg0Isn54x6gm4fDMHDd4dFaXpWbQqcBfoN13/Iq2pga2qEOtMhHlrqaB3AfSJjBZ9I9fbj1ZqOiF1vMKuzGikAGPnpc2ROKTJlkSsgY/O4LNCakF5BV7+4486DKmhPHZiPa1SYg9JjBnmizq3/JRnYRwM5EqaJFmvU4gPJM0sexGCrjFIQYpg2HT3KquyoAUoxYCsKDH7hHEVxBj1RNKC7oWaYfc6h5mBgZVjToiF6PesSwWL6JzecF1Zr6WyfkRLuMS62iHPmCDFg2TOelcZOISUg/eEwYp9ZAJcJ2inBUvYngXy6B3h64qGChrN2Fr6QYGf6mny5+FEppEmwyJG/mbYK+IARzLHFYaDlM2Epgp7tCvYAeIizW6a3FVwlLEZIlaleO7demkyi1bNWhtxLD/O4INBOauVBI70SIkaVmYumk32AvXu8kAE913U6hao2ADLu7pYaGsdZJHIZ+T2E6Fa1NNAqrVDG0k6h83qv2D7xsAKrr+VsV8iA24lqmQOIsTTIi8zs/yIwttkVia8GYVTab3K877DnK5bEejKmbRlicIa1qefSRg1/Nk1YUBblqIc+57VxcG9ysFE5kpvFt4h57VhL6vsBblNbDCxUOL3wN0dxVlSDbZdgAZLHZ48AzXZ1xKmE91hDPhRIYBx1pvzAJA7l8SuL2SAcBTUOVk9Nn8oK23T13Xryp4rFWzYjom7D3rf6+z/ahWr+1elrAIu7kjl/w/YScd0uaw+djp9LhBgk9XXUdjLZFAFnebgBoA+9MtI8V6S9l7rfUN9uaWZwy5DLrOPx3yopy4+tk78cnHzXJ4bcQ/5vZMtHaJwJB5VPlbjIQ2sWjJM+G5W5E1RJMOy66YbtZKh3gEWES2ybwnx193kfsHNLOdKpvaCvi8LAGOfQCyrRJ36A/OnICOaT/J5DwA+yT+zSgXjhdGz7+uc4Kscu5zh34++rYu0OWPnFUiZZ7TmUNS57h7AuuCoh7KMlAmW+OqcbNvmEQTh5UChGemiFJjkStmaTpqF7Weds0XaL2PXXWhmamQ090n4H7XIbpatHjqGI4oPMzIrYl77/xtFPLZZmZGksBVk728ZZN0/4aJVpmtz0ljnkSZP/C7GwtK4GtCUVSFFuEy2w5qUCMsNzOqHBZpZXduC0w5suGXfgA8iUSefiRdgvNrk5QUnMtwm12iuL/O5dAaSdZGpOZsn8xXzxMPgpQOLaqKRT7KWmWOyzy6kFmbBqRr9C8Uno2wuoXJMdg13r2Ux1ha3JR17U17oi3PWHeRN3iHzzcEIBqdEpvARpM+Ge9ougYszvPP8rH0CFVxPK+1p6ar+Rx87KW+aVvU4t+4ZWgxH9hdnEy7HOEL1WQyieVmANPzUie8P8Fqr2eIz1/uXQN0//m2R2NzYyCMIZYk7eCoXVZxZ87IroUG4/LaDi0F2q3ZkuJQLN224/WQfEbMiqytruunwJHQIJ2bzwmvXjhIiye43K5fFFGYylZqusCUPz9cvdMqs8aSKl+YJTc2LTw42Mu5lVJM+eLHFRDrkbYY88oxfTyxXKOW4jFbpIEygBlzF9q3lMLeI2NPzr2ymqBQt43prUIDVzZnTctYFyVwZzNBpUBWL0oFTs6DnRJmOTg3NgL+YF5B5aHEaknmQBqCSpbcyDiShi7L4b4WyZTg5Ofuwmn+mteBZ3tlM4sQBVt9qcAwPeSOqLZ+XSYU9OS6JvAOYzNFdF+pX2uq4/RESTvLwTuWY991e32KYD45vgnw6mL+9e//h72tSrlhMEQhbysh2WXRMkKs1BFdD8laiW8bhLQ49LqRGx0pYm1csI28Ci+JXXLpggkCqkug6iwKfmf4QYE+jM9ezbpIxSV+OybCkG5LKpr3ZcZMVfbMHZn4eYdrunOdbjo9QXXqqG/ahVqXJmULra5kOljN9fk+FWJOT95cbDsXEdU988+Sb2OVoUSH9KRuD4hFN2G2nd3StDKANgWA8w0UF+7ZubzmzxathLG/Ep1d4JN89FKQHZv8Kktjqodw5v9n65a8/mNTPL04hYmePlL04DhckF4+ky9R2Qzd40mt9IesekSETcaps7weB+YpvUKb3gP2Y9pk7Xz1SlpPge5VgGJkLoPuk8ZyCwILL4lDvZ6HLecM5CJPJKoPDtL6atro8Km6WF+F2mECH/m6v8E83+up52Tv6pGgib4wE7dfbMWGdKLer5QTHETTwUoGKVPNLdnC1sFxmc09ZJgo2jrmdlvmD/VsVWHA/zTYRm6vLzp6w2zJBcROd2N+tJtlmpcRT1y4Ey6MHksanVmpzAFesp+UK5VxyNE2OUrk6P8/SBV4nX7TyDwSecQWIuryohyvmjRVsv2Y2d1dbjLdbF2tHELNcZkj6zC9J3qNcwzDoj8iUX3/6kKNXjp1k0h+ovOAjuJuFKhMBB4UsBHszieO+fIecDDCV/55iUJQsPl7Kbi9oQOFzRZTeP10bR9kq2ukNeOlEK6HP36+Ha0ZIGMjg7GHW+wlDn1PYgcOGsxMvAyuRyRiBgatP67/Gwyz5Ekdfv1qPFoGxSuaPm1xISv6ZQX/cSF78cdOPW1T+c9DLx9LMt8u8KXswYTbyXYYnJOo8l5xYJJoJPweOSs307RJlbKz2TldHZa54Xnre0Cgz7zB+TG9Dl2JkBhFKpNROk/iS++kLMCBEl7VD3fN1kchWLijSP6ge8s9JMt0XECzPlGgtNNC9+jaXqj49lyNZAVBBjy9vmPWW7UtOTjKmJ+5YP52px0T9eEGhHJIjf/4P+CooDg==')))
+          dec=json.JSONDecoder()
+          for k,q,ch,key in patch:
+              tok='{"id":'+json.dumps(k)+','
+              assert s.count(tok)==1,k
+              st=s.index(tok);a=s.index('"choices":',st)+10
+              old,l=dec.raw_decode(s[a:]);assert len(old)==4
+              c=re.compile('"correct_index":(\\d)').search(s,a);assert int(c.group(1))==key and c.start()-a<2500
+              new=json.dumps(ch,ensure_ascii=True,separators=(',',':'))
+              s=s[:a]+new+s[a+l:]
+          b=json.loads(s[len('window.C40DATA='):].strip().rstrip(';'));o=json.loads(orig[len('window.C40DATA='):].strip().rstrip(';'))
+          ids={x[0] for x in patch}
+          def walk(x,y):
+              if isinstance(x,dict):
+                  assert x.keys()==y.keys()
+                  if x.get('id') in ids:
+                      for kk in x:
+                          if kk!='choices': assert x[kk]==y[kk]
+                      return 1
+                  return sum(walk(x[kk],y[kk]) for kk in x)
+              if isinstance(x,list):
+                  assert len(x)==len(y);return sum(walk(i,j) for i,j in zip(x,y))
+              assert x==y;return 0
+          n=walk(o,b);assert n==len(patch),n
+          p.write_text(s)
+          sw=pathlib.Path('sw.js');t=sw.read_text();assert 'c40-cr-mockfix-20261021' in t
+          sw.write_text(t.replace('c40-cr-mockfix-20261021','c40-cg-choices-20261021'))
+          print(len(patch),hashlib.sha256(s.encode()).hexdigest())
+          PY
+          rm .github/workflows/cg-choices.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data.js sw.js .github/workflows/cg-choices.yml
+          git commit -m 'Rebalance CG choices options'
+          git push
