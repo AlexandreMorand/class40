@@ -10,8 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: fetch code payload
         run: |
-          curl -sL "https://drive.google.com/uc?export=download&id=12VHTpul7BS8k2_T3YW1LY01sVoVNQlbW" -o /tmp/payload-v2.py
-          python3 /tmp/payload-v2.py
+          curl -sL "https://drive.google.com/uc?export=download&id=1mZGNTc1SGcy6p1W8LaV1nZm1ILNxaaPQ" -o /tmp/payload-v2.txt
+          python3 /tmp/payload-v2.txt
       - name: fetch fiches
         run: |
           curl -sL "https://drive.google.com/uc?export=download&id=1-7cyg_G134-4WX48IylUhknggU-g2N1B" -o fiches/cr-1.pdf
