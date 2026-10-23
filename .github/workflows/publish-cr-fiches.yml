@@ -1,0 +1,80 @@
+name: publish-cr-fiches
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch fiches
+        run: |
+          curl -sL "https://drive.google.com/uc?export=download&id=1-7cyg_G134-4WX48IylUhknggU-g2N1B" -o fiches/cr-1.pdf
+          test "$(sha256sum fiches/cr-1.pdf | cut -d' ' -f1)" = "20f1665b71b4a57ddf281fcdc796abfd2ecfde442a22b8ddfab9afdc82a66aea"
+          curl -sL "https://drive.google.com/uc?export=download&id=13foETKJA9MNlDcL9D6PQsr9o2FIw-Aaa" -o fiches/cr-2.pdf
+          test "$(sha256sum fiches/cr-2.pdf | cut -d' ' -f1)" = "85bc242706882e73314adf6bb7b8e240ded425e7f3d7deeb212c6dba77eb46f1"
+          curl -sL "https://drive.google.com/uc?export=download&id=1mz6hl0PwrH1lqU1bjj6z6ow0GwEvVuD7" -o fiches/cr-3.pdf
+          test "$(sha256sum fiches/cr-3.pdf | cut -d' ' -f1)" = "47d2992f6473069f755a8fd5aa0939cb4d83844765e786777c741befebd436d5"
+          curl -sL "https://drive.google.com/uc?export=download&id=1keBFCJPr7uDF6gVN9xNKbqsL0EffNC8G" -o fiches/cr-4.pdf
+          test "$(sha256sum fiches/cr-4.pdf | cut -d' ' -f1)" = "c38d2191eb177fa4335f89caacbb5d5579acc0b86de5bc588a47cc6e3f7caeb9"
+          curl -sL "https://drive.google.com/uc?export=download&id=1NoH0plrGCfTb0Op_K4HxUlyDPNzIfy3L" -o fiches/cr-5.pdf
+          test "$(sha256sum fiches/cr-5.pdf | cut -d' ' -f1)" = "8d8d0bf8b0ae19b68840da26800c1ceb597b89968c0b27d76e0586d4409c00fb"
+          curl -sL "https://drive.google.com/uc?export=download&id=1-jcdne0G3RbVnvSKa2EYdmwcp8l9R0yk" -o fiches/cr-6.pdf
+          test "$(sha256sum fiches/cr-6.pdf | cut -d' ' -f1)" = "998fe160db542e36be72c2fe6f308ba98ca6feffab4227b99ff063bde0c762a5"
+          curl -sL "https://drive.google.com/uc?export=download&id=1wrOIE9JQZTW16kjkCK9NMrZKLS1Qalq7" -o fiches/cr-7.pdf
+          test "$(sha256sum fiches/cr-7.pdf | cut -d' ' -f1)" = "66756002890014b23ba9ad1e860b4b520b8774fedced39221bd7ea679e7e144b"
+          curl -sL "https://drive.google.com/uc?export=download&id=14DP1BU1MmkaHks_MuvEcBY_F6nNVbcZn" -o fiches/cr-8.pdf
+          test "$(sha256sum fiches/cr-8.pdf | cut -d' ' -f1)" = "2741e5a807ba5649f866e2d9959340831c51f2fb4e068cfb7e2569159ad9a926"
+          curl -sL "https://drive.google.com/uc?export=download&id=1CRq6ZXZb_XDPskGUc8HreSKSMaebFCnc" -o fiches/cr-9.pdf
+          test "$(sha256sum fiches/cr-9.pdf | cut -d' ' -f1)" = "1910fd6cb3b0348a1bbb0e8eaa47244e7d8e272ce55a12f1d5520b7ebb2c476c"
+          curl -sL "https://drive.google.com/uc?export=download&id=13PEiNngO_aJkacjtgcYrCy1pQ854_dVI" -o fiches/cr-10.pdf
+          test "$(sha256sum fiches/cr-10.pdf | cut -d' ' -f1)" = "7672eb287c7eeacbc7df71aea67c91d34c48aa7f7829a6403098bfac3ef261d7"
+          curl -sL "https://drive.google.com/uc?export=download&id=1-Uzbh9MRXvbzGP9izBqLDYno2LxEhPnf" -o fiches/cr-11.pdf
+          test "$(sha256sum fiches/cr-11.pdf | cut -d' ' -f1)" = "b4e86e2f9d46faeec7c278900f13fb06549dc48c7c2de5b9d12f95cf74c3d7a3"
+          curl -sL "https://drive.google.com/uc?export=download&id=1ikBfpXtzJ-byxvL3I3GvpF-sXnMh310P" -o fiches/cr-12.pdf
+          test "$(sha256sum fiches/cr-12.pdf | cut -d' ' -f1)" = "b9afe3fdabc8db82c96679e08245b71cefdd2b7e14ed5b417b5a665da729eeaa"
+          curl -sL "https://drive.google.com/uc?export=download&id=14cAY-H7-m-Kvy8_EYp-HX3pnzcwQAdyM" -o fiches/cr-13.pdf
+          test "$(sha256sum fiches/cr-13.pdf | cut -d' ' -f1)" = "c7a3259c68ed7d18a6cfa8f23ce3694ef7dc2e28537b7e0cddb91e315884e652"
+          curl -sL "https://drive.google.com/uc?export=download&id=1G2U_g1QQsMqWXHLjIPGzedyJ_Z8hh6ax" -o fiches/cr-14.pdf
+          test "$(sha256sum fiches/cr-14.pdf | cut -d' ' -f1)" = "d30c4825d7e9aefb95710bb73cd08cdac670adf66aa0df5cdbadcf8764a2822d"
+          curl -sL "https://drive.google.com/uc?export=download&id=1iCstVEFmTHbl4yq45f9M3Fg-3TXUzztu" -o fiches/cr-16.pdf
+          test "$(sha256sum fiches/cr-16.pdf | cut -d' ' -f1)" = "08d1eaa9074aa58cca64750c333e45862aff6eeb29ccfd4c24d45aced1d7d440"
+          curl -sL "https://drive.google.com/uc?export=download&id=1tusXO0xilG3vodKI5VOQ1X6hkAAhPeIK" -o fiches/cr-17.pdf
+          test "$(sha256sum fiches/cr-17.pdf | cut -d' ' -f1)" = "e6ba75dec6d5aae35f875e7ce9c5ba932bd88e64043f1ddf56f007c97c5cf692"
+          curl -sL "https://drive.google.com/uc?export=download&id=1MZoFfzdknU1A5RB0qUGl9hhS-0twEvEn" -o fiches/cr-18.pdf
+          test "$(sha256sum fiches/cr-18.pdf | cut -d' ' -f1)" = "7ce6e4ad23966e852c8115b685c00a6f50fe4d5d5c3ca1ef82f2fb129b96d696"
+          curl -sL "https://drive.google.com/uc?export=download&id=1JPTwUuX-D4BdwvTVVPsbCf5ptVwAKSHg" -o fiches/cr-19.pdf
+          test "$(sha256sum fiches/cr-19.pdf | cut -d' ' -f1)" = "07debb93f168bc62558e8129a8e5a97cd56cc7c7dd5c84578cb0fde56b08452e"
+          curl -sL "https://drive.google.com/uc?export=download&id=1absKrOkZP1uk393LMkZyYAnslrjigkdd" -o fiches/cr-20.pdf
+          test "$(sha256sum fiches/cr-20.pdf | cut -d' ' -f1)" = "b92964a59cb52b961e9452effac291df9f5219c7e929f1e1ce424d8661c67a8d"
+          curl -sL "https://drive.google.com/uc?export=download&id=1Ew7GcGsNY4ivYbo438nSVBUMjXCaSQRt" -o fiches/cr-21.pdf
+          test "$(sha256sum fiches/cr-21.pdf | cut -d' ' -f1)" = "45d612e69183de16019440a081aa3eca44557a4dd7a090fbede8b3d64ed39092"
+          curl -sL "https://drive.google.com/uc?export=download&id=1R1dYU3SNrJ3u1Ud7B_DHgjsIJs5SY5wO" -o fiches/cr-22.pdf
+          test "$(sha256sum fiches/cr-22.pdf | cut -d' ' -f1)" = "34ee6ceaf73fa379f86396284060dfe3ea4ffcacd6b8e8fc16a640fbeb3f964c"
+          curl -sL "https://drive.google.com/uc?export=download&id=1eKC0J-SZEqtM8bmFbC0_lQuZZcWvkbrf" -o fiches/cr-23.pdf
+          test "$(sha256sum fiches/cr-23.pdf | cut -d' ' -f1)" = "57f5e0f57db49a939152f10df4d892051246e325512125e097ec446263ebda80"
+          curl -sL "https://drive.google.com/uc?export=download&id=1GyJZ1Y4K78wkw4eqJkeqh7F4r5jdD4qw" -o fiches/cr-24.pdf
+          test "$(sha256sum fiches/cr-24.pdf | cut -d' ' -f1)" = "c1fcc9c344b02046657f80c35043f5d2e21567f3e2644e09435d9e0e1e8e3a5e"
+          curl -sL "https://drive.google.com/uc?export=download&id=13s-gxk2VM8oSJ37StRq4GDcPTG9SnIcP" -o fiches/cr-25.pdf
+          test "$(sha256sum fiches/cr-25.pdf | cut -d' ' -f1)" = "da68c8c8d5e7075947d2bd675ffe14a07e7a6bdaeb62ae04b9639fc98951a680"
+          curl -sL "https://drive.google.com/uc?export=download&id=1W1SP6ylaPt0nm2sKtkaLTuA29P9JC1dM" -o fiches/cr-26.pdf
+          test "$(sha256sum fiches/cr-26.pdf | cut -d' ' -f1)" = "fc65f730f92ce0f5efd7c9033c5ff8dc22237f30a3d78c378f54182842f694e7"
+          curl -sL "https://drive.google.com/uc?export=download&id=1Uh2Hr1awXU_bJ-o96GIqt-BEPmyLN0k7" -o fiches/cr-27.pdf
+          test "$(sha256sum fiches/cr-27.pdf | cut -d' ' -f1)" = "e6ac8235d70f197ffdec0ae0656a636b9a26da46ead82a68d71db7c462d1c846"
+          curl -sL "https://drive.google.com/uc?export=download&id=1KwLcONHR3SXc11dbXduUhv0d4UircuOx" -o fiches/cr-28.pdf
+          test "$(sha256sum fiches/cr-28.pdf | cut -d' ' -f1)" = "eca2ee7bc5e601c21613f1d328a7ebcb6f145aed89f61e28eb2e303ccd31b8bf"
+          curl -sL "https://drive.google.com/uc?export=download&id=13JM5t18VeO2ScJoL5-xz7ZpgcvrZ5K2R" -o fiches/cr-29.pdf
+          test "$(sha256sum fiches/cr-29.pdf | cut -d' ' -f1)" = "a8e977176af4e63dcf97079c50c1c428279c7ac01e0cffa38c0601ff7e63c667"
+          curl -sL "https://drive.google.com/uc?export=download&id=1MqVMvgpnTMZq8kx4nzG9Yqy0HhKYGCKp" -o fiches/cr-30.pdf
+          test "$(sha256sum fiches/cr-30.pdf | cut -d' ' -f1)" = "6088995ec62044bf2e3cae1bf2b542931b11e3e8598c4edf7b4674cdbace13ef"
+          curl -sL "https://drive.google.com/uc?export=download&id=1XRyP-2xGheUVhbQBb8NR56Wnx_aYBoVP" -o fiches/cr-31.pdf
+          test "$(sha256sum fiches/cr-31.pdf | cut -d' ' -f1)" = "53907b55288cd599cf2bd269743c7e384f1ca2285dcdb2915b7965bd8951f1fa"
+      - name: commit
+        run: |
+          git config user.name "class40-bot"
+          git config user.email "bot@localhost"
+          rm -f .github/workflows/publish-cr-fiches.yml
+          git add fiches/ .github/workflows/publish-cr-fiches.yml
+          git commit -m "Fiches CR: nouvelle mise en page (sessions 1 a 31)"
+          git push
