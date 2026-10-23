@@ -81,7 +81,7 @@ function cards(cid, n){
 }
 function progressKey(cid,session,id){ return cid+'|'+String(session)+'|'+String(id); }
 function questionProgressKey(cid,q){ return progressKey(cid,contentSessionKey(cid,q),q.id); }
-function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261021-add'; }
+function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261023-f1'; }
 
 /* ---------- STORE + MIGRATION ---------- */
 var KEY='c40.v2', OLDKEY='c40.db.v1';
@@ -540,6 +540,7 @@ function vCourse(cid){
   + '<div class="ch" data-go="#/q/'+cid+'"><span class="num">'+IC.qcm+'</span><div class="tx"><b>QCM blanc</b><span>toutes les sessions, ordre aleatoire</span></div><span class="go">Lancer</span></div>'
   + (cid==='da' ? '<div class="ch" data-go="#/q/da/all/dataset"><span class="num">'+IC.data+'</span><div class="tx"><b>QCM datasets R</b><span>'+(D.QCM_DATA.da||[]).length+' questions sur SUP / TOP / WINE / PSA...</span></div><span class="go">Lancer</span></div>' : '')
   + '<div class="ch" data-go="#/f/'+cid+'"><span class="num">'+IC.card+'</span><div class="tx"><b>Flashcards du cours</b><span>'+(D.FLASHCARDS[cid]||[]).length+' cartes, toutes sessions</span></div><span class="go">Reviser</span></div>'
+  + (cid==='cr' ? '<a class="ch" href="https://drive.google.com/file/d/14k3jjXn0V_cVrS0QWJK3YpPhgILYQp5O/view" target="_blank" rel="noopener"><span class="num">'+IC.pdf+'</span><div class="tx"><b>Exercices corrigés du livre</b><span>chapitres 1 à 15, document privé</span></div><span class="go">Ouvrir</span></a>' : '')
   + (D.CHEATSHEET[cid] ? '<div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese</b><span>tout le cours en une page</span></div><span class="go">Lire</span></div>' : '')
   + '</div>'
   + '<div class="card"><h2>Echeances '+c.code+'</h2>'
