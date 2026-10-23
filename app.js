@@ -652,7 +652,7 @@ function qbSessions(cid){
   return ss.filter(function(s){ return bank(cid,s.key).length>0 || levelBank(cid,s.key).length>0; });
 }
 function qbPool(cid, skey, level){
-  var keys = skey==='all' ? qbSessions(cid).map(function(s){return s.key;}) : [skey];
+  var keys = skey==='all' ? qbSessions(cid).map(function(s){return s.key;}) : (Array.isArray(skey) ? skey : [skey]);
   var pool=[], seen={};
   keys.forEach(function(k){
     var items;
@@ -662,9 +662,21 @@ function qbPool(cid, skey, level){
   });
   return pool;
 }
+function qbSessionOn(skey){
+  return qb.session!=='all' && (Array.isArray(qb.session) ? qb.session.indexOf(skey)>=0 : qb.session===skey);
+}
 function qbSet(k, v){
   if(k==='course'){ qb.course=v; qb.session='all'; qb.level=0; }
-  else if(k==='session'){ qb.session=v; }
+  else if(k==='session'){
+    if(v==='all'){ qb.session='all'; }
+    else{
+      var cur = Array.isArray(qb.session) ? qb.session.slice() : (qb.session==='all' ? [] : [qb.session]);
+      var i = cur.indexOf(v);
+      if(i>=0) cur.splice(i,1); else cur.push(v);
+      cur.sort(function(a,b){ return parseInt(a,10)-parseInt(b,10); });
+      qb.session = cur;
+    }
+  }
   else if(k==='level'){ qb.level=parseInt(v,10)||0; }
   else if(k==='count'){ qb.count=v; }
   render();
@@ -679,7 +691,7 @@ function vQBuilder(){
   var cid=qb.course, c=courseOf(cid);
   var cBtn=COURSES.map(function(cc){ return qbBtn('qbset','course',cc.id,cc.name,qb.course===cc.id,false); }).join('');
   var sBtns=qbBtn('qbset','session','all','Toutes les sessions',qb.session==='all',false);
-  qbSessions(cid).forEach(function(s){ sBtns+=qbBtn('qbset','session',s.key,'Session '+s.n,qb.session===s.key,false); });
+  qbSessions(cid).forEach(function(s){ sBtns+=qbBtn('qbset','session',s.key,'Session '+s.n,qbSessionOn(s.key),false); });
   var lvlBtns='', lvlNote='';
   if(qbHasLevels(cid)){
     lvlBtns=qbBtn('qbset','level','0','Toutes',qb.level===0,false)
@@ -700,7 +712,7 @@ function vQBuilder(){
     : '<div style="font-size:13px;color:var(--muted);margin-top:6px">Aucune question pour ce réglage, élargis la sélection.</div>';
   return '<button class="back" data-go="#/">&larr; Accueil</button>'
     + '<div class="page-h">QCM à la carte</div>'
-    + '<div class="page-sub">Choisis la matière, le thème, la difficulté et la longueur. Le tirage est mélangé à chaque lancement et chaque réponse compte dans ta progression.</div>'
+    + '<div class="page-sub">Choisis la matière, la difficulté et la longueur, et touche plusieurs sessions pour mélanger leurs questions. Le tirage est mélangé à chaque lancement et chaque réponse compte dans ta progression.</div>'
     + '<div class="card">'
     + qbRow('Matière', cBtn)
     + qbRow('Thème', sBtns)
@@ -722,8 +734,12 @@ function startCustomQuiz(retry){
 }
 function qbTitle(){
   var p=quiz.custom, parts=[courseOf(p.course).name];
-  if(p.session!=='all') parts.push('Session '+p.session);
-  else parts.push('toutes sessions');
+  if(p.session==='all') parts.push('toutes sessions');
+  else if(Array.isArray(p.session)){
+    if(p.session.length===1) parts.push('Session '+p.session[0]);
+    else parts.push('Sessions '+p.session.join(', '));
+  }
+  else parts.push('Session '+p.session);
   if(p.level) parts.push(levelLabel(p.level));
   return 'QCM à la carte · '+parts.join(' · ');
 }
