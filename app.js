@@ -65,7 +65,7 @@ function levelTiles(cid,n){
 }
 function setsOf(cid, n){
   var m = {}, out = [];
-  bank(cid,n).forEach(function(q){ var s = q.set||1; if(!m[s]){ m[s]=1; out.push(s); } });
+  bank(cid,n).filter(function(q){return !q.supplement;}).forEach(function(q){ var s = q.set||1; if(!m[s]){ m[s]=1; out.push(s); } });
   return out.sort(function(a,b){ return a-b; });
 }
 function setProgress(cid, n, set){
@@ -547,6 +547,13 @@ function vCourse(cid){
   + (allDeadlines().filter(function(d){ return d.course===cid; }).map(dlRow).join('') || '<p style="font-size:12.5px;color:var(--muted)">Aucune.</p>')
   + '</div></aside></div>';
 }
+function supplementTiles(cid,n){
+  var groups={}; bank(cid,n).filter(function(q){return q.supplement;}).forEach(function(q){groups[q.set]=q;});
+  var tiles=Object.keys(groups).sort(function(a,b){return Number(a)-Number(b);}).map(function(sn){var q=groups[sn],p=setProgress(cid,n,Number(sn));
+    return '<div class="tile" data-go="#/q/'+cid+'/'+n+'/set'+sn+'"><span class="ic">'+IC.qcm+'</span><b>Complement '+esc(q.supplement)+' &middot; '+levelLabel(q.level)+'</b><span>'+p.done+'/'+p.total+' questions &middot; '+p.acc+'% reussite</span><div class="bar"><i class="'+(p.pct===100?'full':'')+'" data-w="'+p.pct+'"></i></div><span class="arrow">'+(p.done?'Continuer':'Commencer')+' &rarr;</span></div>';
+  }).join('');
+  return tiles ? '<div class="card"><h2>Entrainement complementaire</h2><p>Des series distinctes. Vos trois niveaux et leurs reponses restent inchanges.</p><div class="tiles">'+tiles+'</div></div>' : '';
+}
 function legacyTiles(cid,n){
   return setsOf(cid,n).map(function(sn){
     var bp=setProgress(cid,n,sn),multi=setsOf(cid,n).length>1;
@@ -573,6 +580,7 @@ function vSession(cid, n){
   + '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>'
   + '</div>'
   + (levelBank(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
+  + supplementTiles(cid,s.key)
   + (D.CHEATSHEET[cid] ? '<div class="card"><h2>Synthese du cours</h2><div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese '+c.code+'</b><span>toutes les formules et definitions du cours</span></div><span class="go">Lire</span></div></div>' : '');
 }
 function fcKnown(cid,n){ var cs=cards(cid,n), k=0; cs.forEach(function(c2){ if(store.fc[c2.id]==='known') k++; }); return k; }
@@ -597,6 +605,7 @@ function vQuiz(cid, n, src){
   var c = courseOf(cid);
   var backHash = (n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid;
   var title = isLevel ? levelLabel(parseInt(String(src).slice(5),10))+' · Session '+n : src==='dataset' ? 'QCM datasets R' : (isSet ? 'QCM '+String(src).slice(3)+' · Session '+n : (n && n!=='all' ? 'QCM · Session '+n : 'QCM blanc · '+c.name));
+  if(isSet && quiz.bank[0] && quiz.bank[0].supplement) title='Complement '+quiz.bank[0].supplement+' · '+levelLabel(quiz.bank[0].level)+' · Session '+n;
   if(!quiz.bank.length) return '<button class="back" data-go="'+backHash+'">&larr; Retour</button><div class="page-h">'+esc(title)+'</div><div class="card"><p style="font-size:13px;color:var(--muted)">Pas encore de questions pour cette session.</p></div>';
   if(quiz.idx >= quiz.bank.length) return vQuizDone(backHash, title);
   var q = quiz.bank[quiz.idx];
@@ -657,7 +666,7 @@ function qbPool(cid, skey, level){
   var pool=[], seen={};
   keys.forEach(function(k){
     var items;
-    if(level){ items = levelBank(cid,k,level); }
+    if(level){ items = levelBank(cid,k,level).concat(bank(cid,k).filter(function(q){return q.supplement && q.level===level;})); }
     else { items = bank(cid,k).concat(levelBank(cid,k)); }
     items.forEach(function(q){ if(!seen[q.id]){ seen[q.id]=1; pool.push(q); } });
   });
