@@ -1,6 +1,9 @@
 name: publish-cr12daily25
 on:
   workflow_dispatch:
+permissions:
+  contents: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
