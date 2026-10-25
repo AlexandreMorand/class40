@@ -345,10 +345,7 @@ function allDeadlines(){
   out.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
   return out;
 }
-function dlDays(dateStr){
-  var d = new Date(dateStr); if(isNaN(d)) return null;
-  return Math.ceil((d.getTime() - Date.now())/86400000);
-}
+function dlDays(dateStr){   var d = new Date(dateStr); if(isNaN(d)) return null;   var now = new Date();   var a = new Date(d.getFullYear(),d.getMonth(),d.getDate()), c = new Date(now.getFullYear(),now.getMonth(),now.getDate());   return Math.round((a-c)/86400000); }
 var DL_MONTHS = ['JAN','FEV','MAR','AVR','MAI','JUN','JUL','AOU','SEP','OCT','NOV','DEC'];
 function dlWhen(dateStr){
   var d = new Date(dateStr); if(isNaN(d)) return {b:'?',s:''};
