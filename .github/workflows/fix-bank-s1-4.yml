@@ -1,0 +1,55 @@
+name: fix-cr-bank-s1-s4-20261026
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebalance 13 flagged CR bank questions in sessions 1 to 4
+        run: |
+          python3 << 'PYEOF'
+          import base64, gzip, json
+          fixes = json.loads(gzip.decompress(base64.b64decode("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")))
+          assert len(fixes) == 13
+          s = open('data.js', encoding='utf8').read()
+          for o in fixes:
+              iid = o['id']
+              start = s.find('{"id":"%s"' % iid)
+              assert start > 0, iid + ': not found'
+              depth = 0
+              i = start
+              while True:
+                  c = s[i]
+                  if c == '{': depth += 1
+                  elif c == '}':
+                      depth -= 1
+                      if depth == 0: break
+                  i += 1
+              oldj = json.loads(s[start:i+1])
+              assert oldj['id'] == iid
+              assert oldj['question'] == o['question'], iid + ': stem drift'
+              s = s[:start] + json.dumps(o, ensure_ascii=False, separators=(',',':')) + s[i+1:]
+          open('data.js', 'w', encoding='utf8').write(s)
+          sw = open('sw.js', encoding='utf8').read()
+          assert 'c40-cr-mocks3-20261026' in sw
+          sw = sw.replace('c40-cr-mocks3-20261026', 'c40-cr-bank-s14a-20261026')
+          open('sw.js', 'w', encoding='utf8').write(sw)
+          print('13 bank questions rebalanced, cache bumped')
+          PYEOF
+      - name: Commit and push content
+        run: |
+          git config user.email "alexandre.morand@studbocconi.it"
+          git config user.name "Alexandre Morand"
+          git add data.js sw.js
+          git commit -m "Banque CR sessions 1 a 4: reequilibrage de 13 questions (indices de longueur)"
+          git push
+      - name: Remove one-shot workflow
+        run: |
+          git config user.email "alexandre.morand@studbocconi.it"
+          git config user.name "Alexandre Morand"
+          git rm -q .github/workflows/*.yml
+          git commit -m "Remove one-shot publish workflow"
+          git push
