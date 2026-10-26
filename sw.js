@@ -1,4 +1,4 @@
-const CACHE='c40-cr-deep-s34b-20261026';
+const CACHE='c40-cr-deep-s58a-20261026';
 const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
