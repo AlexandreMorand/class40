@@ -597,7 +597,10 @@ function startQuiz(cid, n, src){
 function vQuiz(cid, n, src){
   var isLevel = /^level[1-3]$/.test(String(src||''));
   var isSet = /^set[0-9]+$/.test(String(src||''));
-  if(n && n!=='all' && src!=='dataset' && !isSet && !isLevel && setsOf(cid,n).length>1){ location.replace('#/s/'+cid+'/'+n); return ''; }
+  if(n && n!=='all' && src!=='dataset' && !isSet && !isLevel){
+    var bdir=bank(cid,n), hasSupp=bdir.some(function(q){return q.supplement;});
+    if(setsOf(cid,n).length>1 || hasSupp || bdir.length>15){ location.replace('#/s/'+cid+'/'+n); return ''; }
+  }
   if(!quiz || quiz.cid!==cid || String(quiz.n)!==String(n) || (quiz.src||null)!==src) startQuiz(cid,n,src);
   var c = courseOf(cid);
   var backHash = (n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid;
