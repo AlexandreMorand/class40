@@ -274,7 +274,7 @@ function vPtBlanc(it){
   if(!ptb || ptb.itemId!==it.id) ptb={itemId:it.id, item:it, idx:0, phase:'intro', ans:{}, texts:{}};
   var back = '<button class="back" data-go="#/pt">&larr; Partiels</button>';
   if(ptb.phase==='intro'){
-    return back + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">Partial Exam I &middot; format officiel</div>'
+    return back + '<div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(((ptExams().filter(function(e){return e.id===it.exam})[0]||{}).label)||'Format officiel')+' &middot; format officiel</div>'
       + '<div class="qcard"><div class="pt-rules">'
       + '<div>'+IC.clock+'<span>'+(it.duration||45)+' minutes &middot; pas de chrono impose ici, chronometre-toi</span></div>'
       + '<div>'+IC.sheet+'<span>'+esc(it.formatNote||'4 QCM a 3 options + 2 questions ouvertes a rediger')+'</span></div>'
@@ -284,9 +284,9 @@ function vPtBlanc(it){
   }
   if(ptb.phase==='done'){
     var h = back + '<div class="page-h">'+esc(it.title)+' &middot; corrige</div>'
-      + '<div class="qcard" style="text-align:center;margin-bottom:16px"><div class="score-big">'+ptb.score.ok+' / '+ptb.score.total+'</div>'
+      + (ptb.score.total>0 ? '<div class="qcard" style="text-align:center;margin-bottom:16px"><div class="score-big">'+ptb.score.ok+' / '+ptb.score.total+'</div>'
       + '<p style="color:var(--muted);font-weight:600;margin:6px 0 4px">QCM &middot; corrige detaille ci-dessous</p>'
-      + (ptb.item.open.length ? '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p>' : '') + '</div>';
+      + (ptb.item.open.length ? '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p>' : '') + '</div>' : '<div class="qcard" style="text-align:center;margin-bottom:16px"><p style="color:var(--muted);font-weight:600;margin:6px 0 4px">Corrige detaille ci-dessous &middot; compare ta redaction a la solution.</p></div>');
     ptb.item.mcq.forEach(function(q, i){
       var mine = ptb.ans[i];
       var opts = q.choices.map(function(ch, j){
