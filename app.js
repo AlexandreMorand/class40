@@ -81,7 +81,7 @@ function cards(cid, n){
 }
 function progressKey(cid,session,id){ return cid+'|'+String(session)+'|'+String(id); }
 function questionProgressKey(cid,q){ return progressKey(cid,contentSessionKey(cid,q),q.id); }
-function ficheUrl(cid,n){ var k=String(n); if(k.indexOf('II-')===0) return null; var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261023-f2'; }
+function ficheUrl(cid,n){ var k=String(n); var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261029-f3'; }
 
 /* ---------- STORE + MIGRATION ---------- */
 var KEY='c40.v2', OLDKEY='c40.db.v1';
