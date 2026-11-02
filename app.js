@@ -894,24 +894,32 @@ function vPlan(){
   var MO = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
   var CL = {cr:'CR', da:'DA', fm:'FM', cg:'CG', adm:'Admin', div:'Divers'};
   function fdate(ds){ var p=ds.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]); return WD[d.getDay()]+' '+d.getDate()+' '+MO[d.getMonth()]; }
-  var tot=0, done=0;
-  plan.days.forEach(function(dy){ dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam') return; tot++; if(chk[dy.d+'|'+i]) done++; }); });
+  function fmin(m){ return m>=90 ? (Math.round(m/6)/10)+' h' : m+' min'; }
+  var tot=0, done=0, perC={}, perCDone={};
+  plan.days.forEach(function(dy){ dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam') return; var m=it.min||0; tot+=m; perC[it.c]=(perC[it.c]||0)+m; if(chk[dy.d+'|'+i]){ done+=m; perCDone[it.c]=(perCDone[it.c]||0)+m; } }); });
   var pct = tot ? Math.round(done*100/tot) : 0;
   var chips = plan.exams.map(function(e){
     var dd = ptDays(e.date), dt = new Date(e.date);
     var dtl = dt.getDate()+' '+MO[dt.getMonth()].slice(0,3)+' &middot; '+('0'+dt.getHours()).slice(-2)+'h'+('0'+dt.getMinutes()).slice(-2);
     return '<div class="plchip pl-'+e.c+'"><b>'+esc(e.label)+'</b><span>'+dtl+(dd!=null&&dd>=0?' &middot; J-'+dd:'')+'</span>'+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</div>';
   }).join('');
+  var courseRows = ['cr','cg','fm','da'].filter(function(c){ return perC[c]; }).map(function(c){
+    var t=perC[c], d=perCDone[c]||0, p=t?Math.round(d*100/t):0;
+    return '<div class="plcours"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700"><span><b class="plc pl-'+c+'">'+CL[c]+'</b>'+esc(courseOf(c).name)+'</span><span>'+fmin(d)+' / '+fmin(t)+'</span></div><div class="bar"><i data-w="'+p+'"></i></div></div>';
+  }).join('');
+  var fmNote = plan.fmNote ? '<div class="plday plfm"><div class="pldate">Perimetre FM</div><div class="plitem ploff" style="font-style:normal">'+esc(plan.fmNote)+'</div></div>' : '';
   function itemHTML(dyD, it, i){
     var k = dyD+'|'+i, on = chk[k] ? 1 : 0;
     if(it.k==='exam') return '<div class="plitem plexam"><span class="pltag">EXAMEN</span><span>'+esc(it.txt)+'</span></div>';
     if(it.k==='off') return '<div class="plitem ploff"><span>'+esc(it.txt)+'</span></div>';
     var link = it.ref ? ' <a class="plgo" href="'+esc(it.ref)+'">ouvrir &rarr;</a>' : '';
-    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+k+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CL[it.c]||it.c)+'</b>'+esc(it.txt)+link+'</span></div>';
+    var dur = it.min ? ' <span class="plmin">'+it.min+' min</span>' : '';
+    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+k+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CL[it.c]||it.c)+'</b>'+esc(it.txt)+dur+link+'</span></div>';
   }
   function dayBlock(dy){
+    var load = dy.items.reduce(function(a,it){ return a+((it.k==='off'||it.k==='exam')?0:(it.min||0)); },0);
     var cls = 'plday'+(dy.d===today?' pltoday':'')+(dy.d<today?' plpast':'');
-    return '<div class="'+cls+'"><div class="pldate">'+fdate(dy.d)+(dy.d===today?' &middot; aujourd\'hui':'')+'</div>'+dy.items.map(function(it,i){ return itemHTML(dy.d,it,i); }).join('')+'</div>';
+    return '<div class="'+cls+'"><div class="pldate">'+fdate(dy.d)+(dy.d===today?' &middot; aujourd\'hui':'')+(load?' &middot; ~'+fmin(load):'')+'</div>'+dy.items.map(function(it,i){ return itemHTML(dy.d,it,i); }).join('')+'</div>';
   }
   var overdue = [];
   plan.days.forEach(function(dy){ if(dy.d>=today) return; dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam'||chk[dy.d+'|'+i]) return; overdue.push({d:dy.d, it:it, i:i}); }); });
@@ -922,9 +930,10 @@ function vPlan(){
   plan.days.forEach(function(dy){ if(dy.d===today) todayDay=dy; else if(dy.d>today) upcoming.push(dy); });
   var todayHtml = todayDay ? dayBlock(todayDay) : '<div class="plday pltoday"><div class="pldate">'+fdate(today)+' &middot; aujourd\'hui</div><div class="plitem ploff"><span>Rien de prevu au plan aujourd\'hui.</span></div></div>';
   return '<div class="page-h">Plan de revision</div>'
-    + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits.</div>'
+    + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits. La charge de chaque jour est indiquee en minutes.</div>'
     + '<div class="plchips">'+chips+'</div>'
-    + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+done+'/'+tot+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div></div>'
+    + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+fmin(done)+' / '+fmin(tot)+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div><div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">'+courseRows+'</div></div>'
+    + fmNote
     + odHtml + todayHtml
     + '<div class="pldate" style="margin-top:20px">A venir</div>'
     + upcoming.map(dayBlock).join('');
