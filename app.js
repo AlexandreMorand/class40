@@ -195,6 +195,7 @@ var IC = {
   qcm:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>',
   card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
   cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
+  plan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a2 2 0 0 1 6 0"/><path d="M9 11l2 2 4-4"/><path d="M9 16h6"/></svg>',
   pdf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -208,6 +209,7 @@ function parseHash(){
   var h = location.hash.replace(/^#\/?/, '');
   var p = h.split('/').filter(Boolean);
   if(!p.length) return {page:'home'};
+  if(p[0]==='plan') return {page:'plan'};
   if(p[0]==='c'&&p[1]) return {page:'course', course:p[1]};
   if(p[0]==='s'&&p[1]&&p[2]!=null) return {page:'session', course:p[1], n:p[2]};
   if(p[0]==='qb') return p[1]==='play' ? {page:'qplay'} : {page:'qbuilder'};
@@ -436,6 +438,7 @@ function moyBind(){
 var root = $('#c40root');
 var navDef = [
   {page:'home', hash:'#/', label:'Accueil', icon:IC.home},
+  {page:'plan', hash:'#/plan', label:'Plan', icon:IC.plan},
   {page:'course', hash:'#/c/cr', label:'Parcours', icon:IC.grid},
   {page:'quiz', hash:'#/qb', label:'QCM', icon:IC.qcm},
   {page:'flash', hash:'#/f/cr', label:'Flashcards', icon:IC.card},
@@ -881,6 +884,52 @@ function vDeadlines(){
   + '</div></aside></div>';
 }
 
+/* ---------- PLAN DE REVISION ---------- */
+function vPlan(){
+  var plan = D.PLAN || {exams:[], days:[]};
+  var chk = store.planChecks || (store.planChecks = {});
+  function dkey(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+  var today = dkey(new Date());
+  var WD = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var MO = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+  var CL = {cr:'CR', da:'DA', fm:'FM', cg:'CG', adm:'Admin', div:'Divers'};
+  function fdate(ds){ var p=ds.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]); return WD[d.getDay()]+' '+d.getDate()+' '+MO[d.getMonth()]; }
+  var tot=0, done=0;
+  plan.days.forEach(function(dy){ dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam') return; tot++; if(chk[dy.d+'|'+i]) done++; }); });
+  var pct = tot ? Math.round(done*100/tot) : 0;
+  var chips = plan.exams.map(function(e){
+    var dd = ptDays(e.date), dt = new Date(e.date);
+    var dtl = dt.getDate()+' '+MO[dt.getMonth()].slice(0,3)+' &middot; '+('0'+dt.getHours()).slice(-2)+'h'+('0'+dt.getMinutes()).slice(-2);
+    return '<div class="plchip pl-'+e.c+'"><b>'+esc(e.label)+'</b><span>'+dtl+(dd!=null&&dd>=0?' &middot; J-'+dd:'')+'</span>'+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</div>';
+  }).join('');
+  function itemHTML(dyD, it, i){
+    var k = dyD+'|'+i, on = chk[k] ? 1 : 0;
+    if(it.k==='exam') return '<div class="plitem plexam"><span class="pltag">EXAMEN</span><span>'+esc(it.txt)+'</span></div>';
+    if(it.k==='off') return '<div class="plitem ploff"><span>'+esc(it.txt)+'</span></div>';
+    var link = it.ref ? ' <a class="plgo" href="'+esc(it.ref)+'">ouvrir &rarr;</a>' : '';
+    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+k+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CL[it.c]||it.c)+'</b>'+esc(it.txt)+link+'</span></div>';
+  }
+  function dayBlock(dy){
+    var cls = 'plday'+(dy.d===today?' pltoday':'')+(dy.d<today?' plpast':'');
+    return '<div class="'+cls+'"><div class="pldate">'+fdate(dy.d)+(dy.d===today?' &middot; aujourd\'hui':'')+'</div>'+dy.items.map(function(it,i){ return itemHTML(dy.d,it,i); }).join('')+'</div>';
+  }
+  var overdue = [];
+  plan.days.forEach(function(dy){ if(dy.d>=today) return; dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam'||chk[dy.d+'|'+i]) return; overdue.push({d:dy.d, it:it, i:i}); }); });
+  var odHtml = overdue.length
+    ? '<div class="plday plod"><div class="pldate">En retard &middot; '+overdue.length+' tache'+(overdue.length>1?'s':'')+' a rattraper</div>'+overdue.map(function(o){ return '<div class="plodd">'+fdate(o.d)+'</div>'+itemHTML(o.d,o.it,o.i); }).join('')+'</div>'
+    : '';
+  var todayDay = null, upcoming = [];
+  plan.days.forEach(function(dy){ if(dy.d===today) todayDay=dy; else if(dy.d>today) upcoming.push(dy); });
+  var todayHtml = todayDay ? dayBlock(todayDay) : '<div class="plday pltoday"><div class="pldate">'+fdate(today)+' &middot; aujourd\'hui</div><div class="plitem ploff"><span>Rien de prevu au plan aujourd\'hui.</span></div></div>';
+  return '<div class="page-h">Plan de revision</div>'
+    + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits.</div>'
+    + '<div class="plchips">'+chips+'</div>'
+    + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+done+'/'+tot+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div></div>'
+    + odHtml + todayHtml
+    + '<div class="pldate" style="margin-top:20px">A venir</div>'
+    + upcoming.map(dayBlock).join('');
+}
+
 /* ---------- SEARCH ---------- */
 var searchIdx = null, searchSel = 0;
 function buildIndex(){
@@ -939,6 +988,7 @@ function render(){
     case 'flash': content = vFlash(r.course, r.n); break;
     case 'cheat': content = vCheat(r.course); break;
     case 'deadlines': content = vDeadlines(); break;
+    case 'plan': content = vPlan(); break;
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
     case 'moyennes': content = vMoyennes(); break;
@@ -963,6 +1013,7 @@ document.addEventListener('click', function(e){
   if(a){
     var act = a.getAttribute('data-act');
     if(act==='search'){ openSearch(); return; }
+    if(act==='plchk'){ var pk=a.getAttribute('data-k'); var pc=store.planChecks||(store.planChecks={}); if(pc[pk]) delete pc[pk]; else pc[pk]=1; save(); render(); return; }
     if(act==='fiche'){ store.fiches[a.getAttribute('data-cid')+'-'+a.getAttribute('data-n')] = true; save(); return; /* laisse le lien s'ouvrir */ }
     if(act==='ans'){ answerQuiz(parseInt(a.getAttribute('data-i'),10)); return; }
     if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
