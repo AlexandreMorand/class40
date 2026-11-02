@@ -246,7 +246,7 @@ function vPartiels(){
       : (days!=null && days>=0 ? '<span class="pt-badge">'+(days===0?"aujourd&#39;hui":'J-'+days)+'</span>' : (days!=null ? '<span class="pt-badge soft">passe</span>' : ''));
     var items = (ex.items||[]).map(function(iid){
       var it = ptItem(iid); if(!it) return '';
-      var det = it.type==='blanc' ? (it.mcq.length+' QCM'+(it.open.length?(' + '+it.open.length+' ouvertes'):'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : (it.det ? esc(it.det) : 'Synthese des Must Know, session par session'));
+      var det = it.type==='blanc' ? ((it.mcq.length? it.mcq.length+' QCM'+(it.open.length?(' + '):'') : '')+(it.open.length? it.open.length+' ouvertes':'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : (it.det ? esc(it.det) : 'Synthese des Must Know, session par session'));
       var sc = it.type==='blanc' ? ptScore(it.id) : null;
       var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
       if(it.url) return '<a class="pt-item" style="text-decoration:none" href="'+esc(it.url)+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+(it.badge?'<span class="pt-new">'+esc(it.badge)+'</span>':'')+'</a>';
@@ -280,6 +280,7 @@ function vPtBlanc(it){
       + '<div>'+IC.sheet+'<span>'+esc(it.formatNote||'4 QCM a 3 options + 2 questions ouvertes a rediger')+'</span></div>'
       + '<div>'+IC.data+'<span>'+esc(it.materialNote||'Closed book · calculatrice scientifique · corrige detaille devoile a la fin')+'</span></div>'
       + '</div><p style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:18px">'+esc(it.intro)+'</p>'
+      + (it.links&&it.links.length ? '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px">'+it.links.map(function(l){return '<a class="cta line" href="'+esc(l.url)+'" download>'+esc(l.label)+'</a>';}).join('')+'</div>' : '')
       + '<button class="cta pri" data-act="ptstart" data-id="'+it.id+'">Commencer le partiel blanc</button></div>';
   }
   if(ptb.phase==='done'){
@@ -827,6 +828,8 @@ function fcMark(status){
 /* ---------- CHEATSHEET ---------- */
 function mdLite(src){
   var html = esc(src);
+  var pres = [];
+  html = html.replace(/```([\s\S]*?)```/g, function(m, c){ pres.push(c.replace(/^\n+|\n+$/g,'')); return '\u0001' + (pres.length-1) + '\u0001'; });
   var lines = html.split('\n'), out = [], inList = false;
   lines.forEach(function(l){
     var line = l;
@@ -840,7 +843,7 @@ function mdLite(src){
     out.push('<p>'+line+'</p>');
   });
   if(inList) out.push('</ul>');
-  return out.join('\n').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+  return out.join('\n').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\u0001(\d+)\u0001/g, function(m, i){ return '<pre class="mdpre">'+pres[+i]+'</pre>'; });
 }
 function vCheat(cid){
   var c = courseOf(cid);
