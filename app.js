@@ -579,7 +579,7 @@ function vSession(cid, n){
     ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
   + (levelBank(cid,s.key).length ? levelTiles(cid,s.key) : legacyTiles(cid,s.key))
-  + '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>'
+  + (nbCards ? '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>' : '')
   + '</div>'
   + (levelBank(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
   + supplementTiles(cid,s.key)
