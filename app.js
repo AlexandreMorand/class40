@@ -908,6 +908,7 @@ function vPlan(){
     return '<div class="plcours"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700"><span><b class="plc pl-'+c+'">'+CL[c]+'</b>'+esc(courseOf(c).name)+'</span><span>'+fmin(d)+' / '+fmin(t)+'</span></div><div class="bar"><i data-w="'+p+'"></i></div></div>';
   }).join('');
   var fmNote = plan.fmNote ? '<div class="plday plfm"><div class="pldate">Perimetre FM</div><div class="plitem ploff" style="font-style:normal">'+esc(plan.fmNote)+'</div></div>' : '';
+  var rulesHtml = (plan.rules&&plan.rules.length) ? '<div class="plday plfm"><div class="pldate">Regles du plan</div>'+plan.rules.map(function(r){ return '<div class="plitem ploff" style="font-style:normal"><span>'+esc(r)+'</span></div>'; }).join('')+'</div>' : '';
   function itemHTML(dyD, it, i){
     var k = dyD+'|'+i, on = chk[k] ? 1 : 0;
     if(it.k==='exam') return '<div class="plitem plexam"><span class="pltag">EXAMEN</span><span>'+esc(it.txt)+'</span></div>';
@@ -933,7 +934,7 @@ function vPlan(){
     + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits. La charge de chaque jour est indiquee en minutes.</div>'
     + '<div class="plchips">'+chips+'</div>'
     + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+fmin(done)+' / '+fmin(tot)+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div><div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">'+courseRows+'</div></div>'
-    + fmNote
+    + rulesHtml + fmNote
     + odHtml + todayHtml
     + '<div class="pldate" style="margin-top:20px">A venir</div>'
     + upcoming.map(dayBlock).join('');
