@@ -12,7 +12,7 @@ On considère des annuités ordinaires (versements en fin de période) dont les 
 
 Le rapport entre deux flux consécutifs vaut toujours le facteur de croissance : R<sub>k</sub> = R<sub>k−1</sub> · (1 + g).
 
-<div class="example"><b>Exemple :</b> annuité ordinaire annuelle de premier flux R = 100 et g = 0,03. Les flux aux dates 2, 3, 4 sont R₂ = 100 · 1,03 = 103, R₃ = 100 · 1,03² = 106,09, R₄ = 100 · 1,03³ = 115,93.</div>
+<div class="example"><b>Exemple :</b> annuité ordinaire annuelle de premier flux R = 100 et g = 0,03. Les flux aux dates 2, 3, 4 sont R₂ = 100 · 1,03 = 103, R₃ = 100 · 1,03² = 106,09, R₄ = 100 · 1,03³ = 109,27.</div>
 
 <div class="key"><b>Proposition 1.1 (annuité ordinaire croissante) :</b> pour A = {(k, R(1+g)<sup>k−1</sup>)}<sub>k=1..n</sub>, R &gt; 0 et i &gt; g ≥ 0 :<br/>V₀ = [R / (i − g)] · [1 − ((1+g)/(1+i))<sup>n</sup>]<br/>V<sub>n</sub> = [R / (i − g)] · [(1+i)<sup>n</sup> − (1+g)<sup>n</sup>]</div>
 
