@@ -516,6 +516,7 @@ function vHome(){
   + '<button class="stat" data-go="#/q/'+state.course+'"><b>'+accuracy()+'%</b><span>reussite moyenne</span><small>au premier essai</small></button>'
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
+  + srsCard()
   + '<div class="card" style="margin-bottom:18px"><h2>Préparer le partial de FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Accès Blackboard</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
   + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
   + courseChips(state.course)
@@ -738,6 +739,7 @@ function vQBuilder(){
     + '</div>';
 }
 function startCustomQuiz(retry){
+  if(retry && quiz && quiz.custom && quiz.custom.srs){ startSrsQuiz(quiz.custom.course); return; }
   if(!retry || !quiz || quiz.src!=='custom'){ var params={course:qb.course, session:qb.session, level:qb.level, count:qb.count}; }
   else { var params=quiz.custom; qb.course=params.course; qb.session=params.session; qb.level=params.level; qb.count=params.count; }
   var pool=qbPool(params.course, params.session, params.level).slice();
@@ -748,6 +750,7 @@ function startCustomQuiz(retry){
   if(location.hash==='#/qb/play') render(); else go('#/qb/play');
 }
 function qbTitle(){
+  if(quiz.custom && quiz.custom.srs) return 'Révision du jour · '+courseOf(quiz.custom.course).name;
   var p=quiz.custom, parts=[courseOf(p.course).name];
   if(p.session==='all') parts.push('toutes sessions');
   else if(Array.isArray(p.session)){
@@ -792,17 +795,56 @@ function vQPlay(){
 
 /* ---------- FLASHCARDS ---------- */
 var fc = null;
+/* ---------- REVISION ESPACEE (flashcards et QCM) ---------- */
+var DAYMS = 86400000, SRS_INT = [0,1,3,7,14,30], NEW_CAP = 12;
+function shuf(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function fcMetaOf(id){ return (store.fcm||{})[id] || null; }
+function fcDue(c){ var m=fcMetaOf(c.id); if(m) return m.due<=Date.now(); return store.fc[c.id]==='again'; }
+function fcNew(c){ return !store.fc[c.id] && !fcMetaOf(c.id); }
+function fcDueCount(cid){ var all=cards(cid,null), d=0, nw=0; all.forEach(function(c){ if(fcDue(c)) d++; else if(fcNew(c)) nw++; }); return {due:d, fresh:Math.min(nw,NEW_CAP)}; }
+function qSrsMap(cid){
+  var m={};
+  store.attempts.filter(function(a){ return a.course===cid; }).sort(function(a,b){ return a.ts-b.ts; }).forEach(function(a){
+    var k=progressKey(a.course,a.session,a.questionId), s=m[k]||(m[k]={streak:0,last:0});
+    s.last=a.ts; if(a.correct) s.streak++; else s.streak=0;
+  });
+  return m;
+}
+function qIsDue(s){ return s.last + SRS_INT[Math.min(s.streak,5)]*DAYMS <= Date.now(); }
+function srsSplit(cid){
+  var pool=qbPool(cid,'all',0), map=qSrsMap(cid), due=[], fresh=[], rest=[];
+  pool.forEach(function(q){ var s=map[questionProgressKey(cid,q)]; if(!s) fresh.push(q); else if(qIsDue(s)) due.push(q); else rest.push(q); });
+  due = shuf(due).sort(function(x,y){ return map[questionProgressKey(cid,x)].streak - map[questionProgressKey(cid,y)].streak; });
+  return {due:due, fresh:shuf(fresh), rest:shuf(rest)};
+}
+function startSrsQuiz(cid){
+  var p=srsSplit(cid), pool=p.due.concat(p.fresh).concat(p.rest).slice(0,20);
+  if(!pool.length) return;
+  quiz = {cid:cid, n:'custom', src:'custom', bank:pool, idx:0, answered:{}, sel:null, t0:Date.now(), ok:0, custom:{course:cid, session:'all', level:0, count:'20', srs:true}};
+  go('#/qb/play');
+}
+function srsCard(){
+  var cid=state.course, f=fcDueCount(cid), p=srsSplit(cid);
+  return '<div class="card" style="margin-bottom:18px"><h2>Révision du jour &middot; '+esc(courseOf(cid).name)+'</h2>'
+    + '<p style="font-size:13px;color:var(--muted);margin:0 0 14px">Une carte réussie revient après 1, 3, 7, 14 puis 30 jours, une carte ratée revient tout de suite. Les QCM suivent la même logique : à revoir d&#39;abord, puis jamais vus.</p>'
+    + '<div class="pt-items"><button class="pt-item" data-go="#/f/'+cid+'/due"><span class="pt-item-t"><b>Flashcards du jour</b><span>'+f.due+' à revoir &middot; '+f.fresh+' nouvelles</span></span><span class="pt-new">Réviser</span></button>'
+    + '<button class="pt-item" data-act="srsquiz" data-cid="'+cid+'"><span class="pt-item-t"><b>QCM de révision</b><span>20 questions &middot; '+p.due.length+' à revoir &middot; '+p.fresh.length+' jamais vues</span></span><span class="pt-new">Commencer</span></button></div></div>';
+}
 function startFc(cid, n){
-  var b = cards(cid, n==='all'?null:n).slice();
-  for(var i=b.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=b[i]; b[i]=b[j]; b[j]=t; }
+  var b;
+  if(n==='due'){
+    var all=cards(cid,null);
+    var due=all.filter(fcDue).sort(function(x,y){ var a=fcMetaOf(x.id), b2=fcMetaOf(y.id); return (a?a.due:0)-(b2?b2.due:0); });
+    b = due.concat(shuf(all.filter(fcNew)).slice(0,NEW_CAP));
+  } else { b = shuf(cards(cid, n==='all'?null:n)); }
   fc = {cid:cid, n:n, deck:b, idx:0, side:0, known:0};
 }
 function vFlash(cid, n){
   if(!fc || fc.cid!==cid || String(fc.n)!==String(n)) startFc(cid, n);
   var c = courseOf(cid);
-  var backHash = (n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid;
-  var title = n && n!=='all' ? 'Flashcards · Session '+n : 'Flashcards · '+c.name;
-  if(!fc.deck.length) return '<button class="back" data-go="'+backHash+'">&larr; Retour</button><div class="page-h">'+esc(title)+'</div><div class="card"><p style="font-size:13px;color:var(--muted)">Pas de cartes pour cette session.</p></div>';
+  var backHash = n==='due' ? '#/' : ((n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid);
+  var title = n==='due' ? 'Flashcards du jour · '+c.name : (n && n!=='all' ? 'Flashcards · Session '+n : 'Flashcards · '+c.name);
+  if(!fc.deck.length) return '<button class="back" data-go="'+backHash+'">&larr; Retour</button><div class="page-h">'+esc(title)+'</div><div class="card"><p style="font-size:13px;color:var(--muted)">'+(n==='due' ? 'Rien à réviser aujourd&#39;hui. Reviens demain, ou lance un QCM de révision.' : 'Pas de cartes pour cette session.')+'</p></div>';
   if(fc.idx >= fc.deck.length){
     return '<button class="back" data-go="'+backHash+'">&larr; Retour</button>'
     + '<div class="page-h">'+esc(title)+' &middot; termine</div>'
@@ -822,7 +864,11 @@ function vFlash(cid, n){
 }
 function fcMark(status){
   var card = fc.deck[fc.idx];
-  store.fc[card.id] = status; save();
+  store.fc[card.id] = status;
+  store.fcm = store.fcm || {};
+  var pm = store.fcm[card.id] || {box:0}, bx = status==='known' ? Math.min(5,(pm.box||0)+1) : 0;
+  store.fcm[card.id] = {box:bx, due:Date.now()+(status==='known' ? SRS_INT[bx]*DAYMS : 0)};
+  save();
   if(status==='known') fc.known++;
   fc.idx++; fc.side=0;
   render();
@@ -1029,6 +1075,7 @@ document.addEventListener('click', function(e){
     if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
+    if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
