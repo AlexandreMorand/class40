@@ -81,7 +81,7 @@ function cards(cid, n){
 }
 function progressKey(cid,session,id){ return cid+'|'+String(session)+'|'+String(id); }
 function questionProgressKey(cid,q){ return progressKey(cid,contentSessionKey(cid,q),q.id); }
-function ficheUrl(cid,n){ var k=String(n); var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261111-f1'; }
+function ficheUrl(cid,n){ var k=String(n); var f=D.FICHE_URLS[cid]; var u=f ? f[k] : null; if(!u) return null; return u + (u.indexOf('?')>=0 ? '&' : '?') + 'v=20261116-f2'; }
 
 /* ---------- STORE + MIGRATION ---------- */
 var KEY='c40.v2', OLDKEY='c40.db.v1';
@@ -338,6 +338,7 @@ function vPtBlanc(it){
 
 
 /* ---------- EXERCICES DU LIVRE ---------- */
+var CR_SUPP={8:[{t:'IFRS 5 supplement',d:'Held for sale and discontinued operations, from the textbook',u:'fiches/cr-ifrs5.pdf'}],10:[{t:'IAS 2 supplement',d:'Inventories, from the textbook',u:'fiches/cr-ias2.pdf'}]};
 function exData(){ return D.EXERCISES || null; }
 function exDone(n){ return !!(store.exDone||{})[n]; }
 function exProgress(c){ var d=0; c.items.forEach(function(i){ if(exDone(i.n)) d++; }); return {done:d, total:c.items.length}; }
@@ -380,6 +381,7 @@ function vEx(ch){
   E.chapters.forEach(function(c){
     var p=exProgress(c), open=String(c.n)===String(ch);
     h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercises'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
+      + (CR_SUPP[c.n]||[]).map(function(f){ return '<div class="exbody" style="display:block;padding:10px 18px"><a href="'+f.u+'?v=20261116" target="_blank" rel="noopener"><b>'+f.t+'</b></a> &middot; '+f.d+'</div>'; }).join('')
       + c.items.map(function(i){
           var ans = i.star ? '<span class="exa star" title="answer reserved for lecturers">* no book answer</span>' : (i.a ? '<span class="exa">answer p. '+i.a+'</span>' : '');
           var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('')+exQHtml(i);
@@ -600,6 +602,7 @@ function vCourse(cid){
   + '<div class="ch" data-go="#/f/'+cid+'"><span class="num">'+IC.card+'</span><div class="tx"><b>Flashcards du cours</b><span>'+(D.FLASHCARDS[cid]||[]).length+' cartes, toutes sessions</span></div><span class="go">Reviser</span></div>'
   + (cid==='cr' ? '<a class="ch" href="https://drive.google.com/file/d/14k3jjXn0V_cVrS0QWJK3YpPhgILYQp5O/view" target="_blank" rel="noopener"><span class="num">'+IC.pdf+'</span><div class="tx"><b>Exercices corrigés du livre</b><span>chapitres 1 à 15, document privé</span></div><span class="go">Ouvrir</span></a>' : '')
   + (cid==='cr' && exData() ? '<div class="ch" data-go="#/ex"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Textbook exercises by chapter</b><span>'+exTotals().total+' exercises as multiple choice questions</span></div><span class="go">Open</span></div>' : '')
+  + (cid==='cr' ? [8,10].map(function(n){ return CR_SUPP[n].map(function(f){ return '<div class="ch"><span class="num">'+IC.pdf+'</span><div class="tx"><b>'+f.t+'</b><span>'+f.d+'</span></div><a class="go" href="'+f.u+'?v=20261116" target="_blank" rel="noopener">Open</a></div>'; }).join(''); }).join('') : '')
   + (D.CHEATSHEET[cid] ? '<div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese</b><span>tout le cours en une page</span></div><span class="go">Lire</span></div>' : '')
   + '</div>'
   + '<div class="card"><h2>Echeances '+c.code+'</h2>'
