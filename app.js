@@ -368,7 +368,8 @@ function vEx(ch){
     h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercices'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
       + c.items.map(function(i){
           var ans = i.star ? '<span class="exa star" title="corrigé réservé aux enseignants">* sans corrigé</span>' : (i.a ? '<span class="exa">corrigé p. '+i.a+'</span>' : '');
-          return '<label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'</span></label>';
+          var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('');
+          return '<div class="exwrap"><label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'<button type="button" class="exshow" data-act="exshow">Énoncé</button></span></label><div class="exbody" hidden>'+body+'</div></div>';
         }).join('')
       + '</details>';
   });
@@ -1120,6 +1121,7 @@ document.addEventListener('click', function(e){
     if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
     if(act==='extoggle'){ exToggle(a); return; }
+    if(act==='exshow'){ var w=a.closest('.exwrap'), bd=w&&w.querySelector('.exbody'); if(bd){ bd.hidden=!bd.hidden; a.textContent=bd.hidden?'Énoncé':'Masquer'; a.classList.toggle('on',!bd.hidden); } e.preventDefault(); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
