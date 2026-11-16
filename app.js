@@ -343,6 +343,20 @@ function exDone(n){ return !!(store.exDone||{})[n]; }
 function exProgress(c){ var d=0; c.items.forEach(function(i){ if(exDone(i.n)) d++; }); return {done:d, total:c.items.length}; }
 function exTotals(){ var E=exData(), t=0, d=0; if(!E) return {done:0,total:0}; E.chapters.forEach(function(c){ var p=exProgress(c); t+=p.total; d+=p.done; }); return {done:d,total:t}; }
 function exChaptersForSession(n){ var E=exData(); if(!E) return []; var k=parseInt(n,10); return E.chapters.filter(function(c){ return c.s.indexOf(k)>=0; }); }
+function exAns(n){ return (store.exAns||{})[n]; }
+function exQHtml(i){
+  var q=i.q; if(!q) return '<div class="exq nq">No multiple choice version for this exercise'+(i.star?' (the book gives no answer, it is reserved for lecturers)':' (the book answer is a full worked solution)')+'. Work it out on paper, then check the book answer on PDF p. '+(i.a||'')+'.</div>';
+  var a=exAns(i.n), done=(a!==undefined&&a!==null);
+  var opts=q.c.map(function(t,j){
+    var cls='opt'; if(done){ if(j===q.k) cls+=' right'; else if(j===a) cls+=' wrong'; else cls+=' dim'; }
+    return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(t)+'</span></button>';
+  }).join('');
+  var fb=done?'<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'">Try again</button></div></div>':'';
+  return '<div class="exq" id="exq-'+i.n+'"><div class="exq-h">Multiple choice</div><div class="exq-s">'+esc(q.s)+'</div>'+opts+fb+'</div>';
+}
+function exFind(n){ var E=exData(), r=null; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.n===n) r=i; }); }); return r; }
+function exScore(){ var E=exData(), a=0, ok=0; if(!E) return {a:0,ok:0}; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.q){ var v=exAns(i.n); if(v!==undefined&&v!==null){ a++; if(v===i.q.k) ok++; } } }); }); return {a:a,ok:ok}; }
+function exRefresh(n){ var i=exFind(n), el=document.getElementById('exq-'+n); if(i&&el){ var t=document.createElement('div'); t.innerHTML=exQHtml(i); el.replaceWith(t.firstChild); } var sc=document.getElementById('ex-score'); if(sc){ var x=exScore(); sc.textContent=x.ok+' correct out of '+x.a+' answered'; } }
 function exToggle(el){
   var n=el.getAttribute('data-n'), ch=el.getAttribute('data-ch');
   store.exDone = store.exDone || {};
@@ -351,25 +365,25 @@ function exToggle(el){
   var row=el.closest('.exrow'); if(row) row.classList.toggle('done', !!store.exDone[n]);
   var E=exData(), c=E.chapters.filter(function(x){ return String(x.n)===ch; })[0];
   if(c){ var p=exProgress(c), t=document.getElementById('exc-'+ch); if(t) t.textContent=p.done+'/'+p.total; }
-  var tt=exTotals(), h=document.getElementById('ex-total'); if(h) h.textContent=tt.done+' faits sur '+tt.total;
+  var tt=exTotals(), h=document.getElementById('ex-total'); if(h) h.textContent=tt.done+' done out of '+tt.total;
 }
 function vEx(ch){
   var E=exData();
-  if(!E) return '<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button><div class="page-h">Exercices du livre</div><div class="card"><p>Donnees indisponibles.</p></div>';
+  if(!E) return '<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button><div class="page-h">Textbook exercises</div><div class="card"><p>Data unavailable.</p></div>';
   var tt=exTotals();
   var chips=E.chapters.map(function(c){ return '<button class="pill'+(String(c.n)===String(ch)?' on':'')+'" data-go="#/ex/'+c.n+'">'+c.n+'</button>'; }).join('');
   var h='<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button>'
-    + '<div class="page-h">Exercices du livre</div>'
-    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.total+' exercices &middot; <span id="ex-total">'+tt.done+' faits sur '+tt.total+'</span></div>'
-    + '<div class="card" style="margin-bottom:16px"><p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6">'+esc(E.note)+' Page indiquée = page du PDF (page imprimée du livre = page PDF moins '+E.offset+'). Corrigés : '+esc(E.ansPart)+'. Les exercices marqués d&#39;une étoile n&#39;ont pas de corrigé dans le livre, il est réservé aux enseignants.</p>'
+    + '<div class="page-h">Textbook exercises</div>'
+    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.total+' exercises &middot; <span id="ex-total">'+tt.done+' done out of '+tt.total+'</span> &middot; <span id="ex-score">'+exScore().ok+' correct out of '+exScore().a+' answered</span></div>'
+    + '<div class="card" style="margin-bottom:16px"><p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6">'+esc(E.note)+' Page shown is the PDF page (printed book page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'. Exercises marked with a star have no answer in the book, it is reserved for lecturers, so their multiple choice answers were worked out separately or are left without one.</p>'
     + '<div class="expills">'+chips+'</div></div>';
   E.chapters.forEach(function(c){
     var p=exProgress(c), open=String(c.n)===String(ch);
-    h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercices'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
+    h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercises'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
       + c.items.map(function(i){
-          var ans = i.star ? '<span class="exa star" title="corrigé réservé aux enseignants">* sans corrigé</span>' : (i.a ? '<span class="exa">corrigé p. '+i.a+'</span>' : '');
-          var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('');
-          return '<div class="exwrap"><label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'<button type="button" class="exshow" data-act="exshow">Énoncé</button></span></label><div class="exbody" hidden>'+body+'</div></div>';
+          var ans = i.star ? '<span class="exa star" title="answer reserved for lecturers">* no book answer</span>' : (i.a ? '<span class="exa">answer p. '+i.a+'</span>' : '');
+          var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('')+exQHtml(i);
+          return '<div class="exwrap"><label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'<button type="button" class="exshow" data-act="exshow">Open</button></span></label><div class="exbody" hidden>'+body+'</div></div>';
         }).join('')
       + '</details>';
   });
@@ -557,7 +571,7 @@ function vHome(){
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
   + srsCard()
-  + (exData() ? '<div class="card" style="margin-bottom:18px"><h2>Exercices du livre</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Tous les exercices de fin de chapitre de Corporate Reporting, avec la page du PDF et celle du corrigé.</p><button class="cta pri" data-go="#/ex">Ouvrir par chapitre &rarr;</button></div>' : '')
+  + (exData() ? '<div class="card" style="margin-bottom:18px"><h2>Textbook exercises</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Every end of chapter exercise of Corporate Reporting, as in the book, answered as a multiple choice question.</p><button class="cta pri" data-go="#/ex">Open by chapter &rarr;</button></div>' : '')
   + '<div class="card" style="margin-bottom:18px"><h2>Préparer l&#39;examen global de CR</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/cr-gen-mock1"><span class="pt-item-t"><b>Mock officiel CR #1</b><span>18 QCM · 35 min · corrigé détaillé</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt"><span class="pt-item-t"><b>Tous les mocks et partiels blancs</b><span>5 mocks officiels, review session du prof, blancs Partie A et B</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
   + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
   + courseChips(state.course)
@@ -585,7 +599,7 @@ function vCourse(cid){
   + (cid==='da' ? '<div class="ch" data-go="#/q/da/all/dataset"><span class="num">'+IC.data+'</span><div class="tx"><b>QCM datasets R</b><span>'+(D.QCM_DATA.da||[]).length+' questions sur SUP / TOP / WINE / PSA...</span></div><span class="go">Lancer</span></div>' : '')
   + '<div class="ch" data-go="#/f/'+cid+'"><span class="num">'+IC.card+'</span><div class="tx"><b>Flashcards du cours</b><span>'+(D.FLASHCARDS[cid]||[]).length+' cartes, toutes sessions</span></div><span class="go">Reviser</span></div>'
   + (cid==='cr' ? '<a class="ch" href="https://drive.google.com/file/d/14k3jjXn0V_cVrS0QWJK3YpPhgILYQp5O/view" target="_blank" rel="noopener"><span class="num">'+IC.pdf+'</span><div class="tx"><b>Exercices corrigés du livre</b><span>chapitres 1 à 15, document privé</span></div><span class="go">Ouvrir</span></a>' : '')
-  + (cid==='cr' && exData() ? '<div class="ch" data-go="#/ex"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Exercices du livre par chapitre</b><span>'+exTotals().total+' exercices, pages et corrigés</span></div><span class="go">Ouvrir</span></div>' : '')
+  + (cid==='cr' && exData() ? '<div class="ch" data-go="#/ex"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Textbook exercises by chapter</b><span>'+exTotals().total+' exercises as multiple choice questions</span></div><span class="go">Open</span></div>' : '')
   + (D.CHEATSHEET[cid] ? '<div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese</b><span>tout le cours en une page</span></div><span class="go">Lire</span></div>' : '')
   + '</div>'
   + '<div class="card"><h2>Echeances '+c.code+'</h2>'
@@ -622,7 +636,7 @@ function vSession(cid, n){
     ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
   + (levelBank(cid,s.key).length ? levelTiles(cid,s.key) : legacyTiles(cid,s.key))
-  + (cid==='cr' ? exChaptersForSession(s.key).map(function(c){ var p=exProgress(c); return '<div class="tile" data-go="#/ex/'+c.n+'"><span class="ic">'+IC.sheet+'</span><b>Exercices du livre &middot; chapitre '+c.n+'</b><span>'+esc(c.t)+' &middot; '+p.done+'/'+p.total+' faits</span><span class="arrow">Ouvrir &rarr;</span></div>'; }).join('') : '')
+  + (cid==='cr' ? exChaptersForSession(s.key).map(function(c){ var p=exProgress(c); return '<div class="tile" data-go="#/ex/'+c.n+'"><span class="ic">'+IC.sheet+'</span><b>Textbook exercises &middot; chapter '+c.n+'</b><span>'+esc(c.t)+' &middot; '+p.done+'/'+p.total+' done</span><span class="arrow">Open &rarr;</span></div>'; }).join('') : '')
   + (nbCards ? '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>' : '')
   + '</div>'
   + (levelBank(cid,s.key).length && setsOf(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
@@ -1121,7 +1135,9 @@ document.addEventListener('click', function(e){
     if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
     if(act==='extoggle'){ exToggle(a); return; }
-    if(act==='exshow'){ var w=a.closest('.exwrap'), bd=w&&w.querySelector('.exbody'); if(bd){ bd.hidden=!bd.hidden; a.textContent=bd.hidden?'Énoncé':'Masquer'; a.classList.toggle('on',!bd.hidden); } e.preventDefault(); return; }
+    if(act==='exans'){ var xn=a.getAttribute('data-n'); store.exAns=store.exAns||{}; if(store.exAns[xn]===undefined){ store.exAns[xn]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
+    if(act==='exreset'){ var rn=a.getAttribute('data-n'); if(store.exAns) delete store.exAns[rn]; save(); exRefresh(rn); e.preventDefault(); return; }
+    if(act==='exshow'){ var w=a.closest('.exwrap'), bd=w&&w.querySelector('.exbody'); if(bd){ bd.hidden=!bd.hidden; a.textContent=bd.hidden?'Open':'Hide'; a.classList.toggle('on',!bd.hidden); } e.preventDefault(); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
