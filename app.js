@@ -220,6 +220,7 @@ function parseHash(){
   if(p[0]==='pt'&&p[1]) return {page:'ptitem', item:p[1]};
   if(p[0]==='pt') return {page:'partiels'};
   if(p[0]==='moy') return {page:'moyennes'};
+  if(p[0]==='ex') return {page:'ex', ch:p[1]||null};
   return {page:'home'};
 }
 function go(h){ location.hash = h; }
@@ -336,6 +337,44 @@ function vPtBlanc(it){
 }
 
 
+/* ---------- EXERCICES DU LIVRE ---------- */
+function exData(){ return D.EXERCISES || null; }
+function exDone(n){ return !!(store.exDone||{})[n]; }
+function exProgress(c){ var d=0; c.items.forEach(function(i){ if(exDone(i.n)) d++; }); return {done:d, total:c.items.length}; }
+function exTotals(){ var E=exData(), t=0, d=0; if(!E) return {done:0,total:0}; E.chapters.forEach(function(c){ var p=exProgress(c); t+=p.total; d+=p.done; }); return {done:d,total:t}; }
+function exChaptersForSession(n){ var E=exData(); if(!E) return []; var k=parseInt(n,10); return E.chapters.filter(function(c){ return c.s.indexOf(k)>=0; }); }
+function exToggle(el){
+  var n=el.getAttribute('data-n'), ch=el.getAttribute('data-ch');
+  store.exDone = store.exDone || {};
+  if(store.exDone[n]) delete store.exDone[n]; else store.exDone[n]=1;
+  save();
+  var row=el.closest('.exrow'); if(row) row.classList.toggle('done', !!store.exDone[n]);
+  var E=exData(), c=E.chapters.filter(function(x){ return String(x.n)===ch; })[0];
+  if(c){ var p=exProgress(c), t=document.getElementById('exc-'+ch); if(t) t.textContent=p.done+'/'+p.total; }
+  var tt=exTotals(), h=document.getElementById('ex-total'); if(h) h.textContent=tt.done+' faits sur '+tt.total;
+}
+function vEx(ch){
+  var E=exData();
+  if(!E) return '<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button><div class="page-h">Exercices du livre</div><div class="card"><p>Donnees indisponibles.</p></div>';
+  var tt=exTotals();
+  var chips=E.chapters.map(function(c){ return '<button class="pill'+(String(c.n)===String(ch)?' on':'')+'" data-go="#/ex/'+c.n+'">'+c.n+'</button>'; }).join('');
+  var h='<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button>'
+    + '<div class="page-h">Exercices du livre</div>'
+    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.total+' exercices &middot; <span id="ex-total">'+tt.done+' faits sur '+tt.total+'</span></div>'
+    + '<div class="card" style="margin-bottom:16px"><p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6">'+esc(E.note)+' Page indiquée = page du PDF (page imprimée du livre = page PDF moins '+E.offset+'). Corrigés : '+esc(E.ansPart)+'. Les exercices marqués d&#39;une étoile n&#39;ont pas de corrigé dans le livre, il est réservé aux enseignants.</p>'
+    + '<div class="expills">'+chips+'</div></div>';
+  E.chapters.forEach(function(c){
+    var p=exProgress(c), open=String(c.n)===String(ch);
+    h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercices'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
+      + c.items.map(function(i){
+          var ans = i.star ? '<span class="exa star" title="corrigé réservé aux enseignants">* sans corrigé</span>' : (i.a ? '<span class="exa">corrigé p. '+i.a+'</span>' : '');
+          return '<label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'</span></label>';
+        }).join('')
+      + '</details>';
+  });
+  return h;
+}
+
 /* ---------- DEADLINES ---------- */
 function allDeadlines(){
   var out = [];
@@ -447,7 +486,7 @@ var navDef = [
 ];
 function navHTML(r){
   return navDef.map(function(n){
-    var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat')) || (n.page==='quiz' && (r.page==='quiz'||r.page==='qbuilder'||r.page==='qplay')) || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
+    var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat'||r.page==='ex')) || (n.page==='quiz' && (r.page==='quiz'||r.page==='qbuilder'||r.page==='qplay')) || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
     if(n.page==='partiels' && (r.page==='partiels'||r.page==='ptitem')) on = true;
     if(n.page==='home' && r.page==='home') on = true;
     if(n.page==='deadlines' && r.page==='deadlines') on = true;
@@ -517,6 +556,7 @@ function vHome(){
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
   + srsCard()
+  + (exData() ? '<div class="card" style="margin-bottom:18px"><h2>Exercices du livre</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Tous les exercices de fin de chapitre de Corporate Reporting, avec la page du PDF et celle du corrigé.</p><button class="cta pri" data-go="#/ex">Ouvrir par chapitre &rarr;</button></div>' : '')
   + '<div class="card" style="margin-bottom:18px"><h2>Préparer l&#39;examen global de CR</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/cr-gen-mock1"><span class="pt-item-t"><b>Mock officiel CR #1</b><span>18 QCM · 35 min · corrigé détaillé</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt"><span class="pt-item-t"><b>Tous les mocks et partiels blancs</b><span>5 mocks officiels, review session du prof, blancs Partie A et B</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
   + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
   + courseChips(state.course)
@@ -544,6 +584,7 @@ function vCourse(cid){
   + (cid==='da' ? '<div class="ch" data-go="#/q/da/all/dataset"><span class="num">'+IC.data+'</span><div class="tx"><b>QCM datasets R</b><span>'+(D.QCM_DATA.da||[]).length+' questions sur SUP / TOP / WINE / PSA...</span></div><span class="go">Lancer</span></div>' : '')
   + '<div class="ch" data-go="#/f/'+cid+'"><span class="num">'+IC.card+'</span><div class="tx"><b>Flashcards du cours</b><span>'+(D.FLASHCARDS[cid]||[]).length+' cartes, toutes sessions</span></div><span class="go">Reviser</span></div>'
   + (cid==='cr' ? '<a class="ch" href="https://drive.google.com/file/d/14k3jjXn0V_cVrS0QWJK3YpPhgILYQp5O/view" target="_blank" rel="noopener"><span class="num">'+IC.pdf+'</span><div class="tx"><b>Exercices corrigés du livre</b><span>chapitres 1 à 15, document privé</span></div><span class="go">Ouvrir</span></a>' : '')
+  + (cid==='cr' && exData() ? '<div class="ch" data-go="#/ex"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Exercices du livre par chapitre</b><span>'+exTotals().total+' exercices, pages et corrigés</span></div><span class="go">Ouvrir</span></div>' : '')
   + (D.CHEATSHEET[cid] ? '<div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese</b><span>tout le cours en une page</span></div><span class="go">Lire</span></div>' : '')
   + '</div>'
   + '<div class="card"><h2>Echeances '+c.code+'</h2>'
@@ -580,6 +621,7 @@ function vSession(cid, n){
     ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
   + (levelBank(cid,s.key).length ? levelTiles(cid,s.key) : legacyTiles(cid,s.key))
+  + (cid==='cr' ? exChaptersForSession(s.key).map(function(c){ var p=exProgress(c); return '<div class="tile" data-go="#/ex/'+c.n+'"><span class="ic">'+IC.sheet+'</span><b>Exercices du livre &middot; chapitre '+c.n+'</b><span>'+esc(c.t)+' &middot; '+p.done+'/'+p.total+' faits</span><span class="arrow">Ouvrir &rarr;</span></div>'; }).join('') : '')
   + (nbCards ? '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>' : '')
   + '</div>'
   + (levelBank(cid,s.key).length && setsOf(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
@@ -1048,6 +1090,7 @@ function render(){
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
     case 'moyennes': content = vMoyennes(); break;
+    case 'ex': content = vEx(r.ch); break;
     default: content = vHome();
   }
   root.innerHTML = shell(content, r);
@@ -1076,6 +1119,7 @@ document.addEventListener('click', function(e){
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
+    if(act==='extoggle'){ exToggle(a); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
