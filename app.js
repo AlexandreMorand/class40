@@ -342,32 +342,46 @@ var CR_SUPP={8:[{t:'IFRS 5 supplement',d:'Held for sale and discontinued operati
 function exData(){ return D.EXERCISES || null; }
 function exDone(n){ return !!(store.exDone||{})[n]; }
 function exAns(n){ return (store.exAns||{})[n]; }
-function exHas(n){ var a=exAns(n); return a!==undefined&&a!==null; }
-function exStatus(i){ if(i.q&&exHas(i.n)) return exAns(i.n)===i.q.k?'ok':'ko'; return exDone(i.n)?'done':''; }
+function exHas(k){ var a=exAns(k); return a!==undefined&&a!==null; }
+function exQs(i){ return i.qs||[]; }
+function exKey(i,j){ return j===0 ? i.n : i.n+'#'+i.qs[j].p; }
+function exStatus(i){
+  var qs=exQs(i);
+  if(qs.length){ var all=true, bad=false; qs.forEach(function(q,j){ var k=exKey(i,j); if(!exHas(k)) all=false; else if(exAns(k)!==q.k) bad=true; }); if(all) return bad?'ko':'ok'; return exDone(i.n)?'done':''; }
+  return exDone(i.n)?'done':'';
+}
 function exProgress(c){ var d=0,ok=0; c.items.forEach(function(i){ var st=exStatus(i); if(st) d++; if(st==='ok') ok++; }); return {done:d, total:c.items.length, ok:ok}; }
 function exTotals(){ var E=exData(), t=0, d=0; if(!E) return {done:0,total:0}; E.chapters.forEach(function(c){ var p=exProgress(c); t+=p.total; d+=p.done; }); return {done:d,total:t}; }
 function exChaptersForSession(n){ var E=exData(); if(!E) return []; var k=parseInt(n,10); return E.chapters.filter(function(c){ return c.s.indexOf(k)>=0; }); }
 function exFind(n){ var E=exData(), r=null; E.chapters.forEach(function(c){ c.items.forEach(function(i,j){ if(i.n===n) r={c:c,pos:j,i:i}; }); }); return r; }
-function exScore(){ var E=exData(), a=0, ok=0; if(!E) return {a:0,ok:0}; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.q&&exHas(i.n)){ a++; if(exAns(i.n)===i.q.k) ok++; } }); }); return {a:a,ok:ok}; }
+function exScore(){ var E=exData(), a=0, ok=0; if(!E) return {a:0,ok:0}; E.chapters.forEach(function(c){ c.items.forEach(function(i){ exQs(i).forEach(function(q,j){ var k=exKey(i,j); if(exHas(k)){ a++; if(exAns(k)===q.k) ok++; } }); }); }); return {a:a,ok:ok}; }
 function exSeqNext(c){ var ss=store.exSess; if(!ss) return null; var L=exChaptersForSession(ss), j=-1; L.forEach(function(x,t){ if(x.n===c.n) j=t; }); return j>=0&&j<L.length-1?L[j+1]:null; }
 function exSessions(){ var E=exData(), m={}; E.chapters.forEach(function(c){ c.s.forEach(function(k){ m[k]=1; }); }); return Object.keys(m).map(Number).sort(function(a,b){return a-b;}); }
 function exSessProg(k){ var d=0,t=0,ok=0; exChaptersForSession(k).forEach(function(c){ var p=exProgress(c); d+=p.done; t+=p.total; ok+=p.ok; }); return {done:d,total:t,ok:ok}; }
 function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items[j])) return j; } return c.items.length; }
 function exCardHtml(c,pos){
-  var i=c.items[pos], q=i.q, has=exHas(i.n), a=exAns(i.n), last=pos>=c.items.length-1;
+  var i=c.items[pos], qs=exQs(i), last=pos>=c.items.length-1, multi=qs.length>1;
   var sq=last?exSeqNext(c):null, nextHref=sq?'#/ex/'+sq.n:'#/ex/'+c.n+'/'+(pos+2);
   var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('');
-  var h='<div class="excard"><div class="exmeta"><b>Exercise '+i.n+'</b><span class="exk '+(i.k==='calculation'?'calc':'')+'">'+i.k+'</span><span>PDF p. '+i.p+'</span></div><div class="exstmt">'+body+'</div>';
-  if(q){
-    h+='<div class="exq-s">'+esc(q.s)+'</div>'+q.c.map(function(t,j){
-      var cls='opt'; if(has){ if(j===q.k) cls+=' right'; else if(j===a) cls+=' wrong'; else cls+=' dim'; }
-      return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(t)+'</span></button>';
-    }).join('');
-    if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div class="exfb-a"><button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'">Try again</button></div></div>';
+  var h='<div class="excard"><div class="exmeta"><b>Exercise '+i.n+'</b><span class="exk '+(i.k==='calculation'?'calc':'')+'">'+i.k+'</span><span>PDF p. '+i.p+'</span>'+(multi?'<span>'+qs.length+' parts</span>':'')+'</div><div class="exstmt">'+body+'</div>';
+  var allDone=qs.length>0;
+  var nextBtn='<button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button>';
+  if(qs.length){
+    qs.forEach(function(q,j){
+      var key=exKey(i,j), has=exHas(key), a=exAns(key); if(!has) allDone=false;
+      h+='<div class="exp'+(has?' answered':'')+'">'+(multi?'<div class="exp-h">Part ('+q.p+')</div>':'')+'<div class="exq-s">'+esc(q.s)+'</div>'+q.c.map(function(t,m){
+        var cls='opt'; if(has){ if(m===q.k) cls+=' right'; else if(m===a) cls+=' wrong'; else cls+=' dim'; }
+        return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-key="'+key+'" data-i="'+m+'"><span class="k">'+'ABCD'[m]+'</span><span>'+esc(t)+'</span></button>';
+      }).join('');
+      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div></div>';
+      h+='</div>';
+    });
+    if(i.np&&i.np.length) h+='<div class="exq nq">No multiple choice for part'+(i.np.length>1?'s ':' ')+i.np.map(function(x){return '('+x+')';}).join(', ')+' (calculation or worked solution). Work '+(i.np.length>1?'them':'it')+' on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>';
+    if(allDone) h+='<div class="exfb-a">'+nextBtn+'</div>';
     else h+='<div class="exhint">Pick A to D. Keys A, B, C, D also work.</div>';
   } else {
     h+='<div class="exq nq">No multiple choice version for this exercise'+(i.star?' (the book gives no answer, it is reserved for lecturers)':' (the book answer is a full worked solution)')+'. Work it out on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>'
-      +'<div class="exfb-a"><button type="button" class="cta '+(exDone(i.n)?'':'pri')+'" data-act="exdone" data-n="'+i.n+'">'+(exDone(i.n)?'Done (tap to undo)':'Mark as done')+'</button><button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button></div>';
+      +'<div class="exfb-a"><button type="button" class="cta '+(exDone(i.n)?'':'pri')+'" data-act="exdone" data-n="'+i.n+'">'+(exDone(i.n)?'Done (tap to undo)':'Mark as done')+'</button>'+nextBtn+'</div>';
   }
   return h+'</div>';
 }
@@ -377,7 +391,7 @@ function exPlayerHtml(c,pos){
   var h='<div id="explayer"><div class="exbar"><i style="width:'+Math.round(100*p.done/p.total)+'%"></i></div><div class="exdots">'+dots+'</div>';
   if(pos>=c.items.length){
     var E=exData(), nx=store.exSess?exSeqNext(c):E.chapters.filter(function(x){ return x.n===c.n+1; })[0];
-    h+='<div class="excard exend"><div class="exend-t">Chapter '+c.n+' complete</div><p>'+p.ok+' correct out of '+c.items.filter(function(i){return i.q&&exHas(i.n);}).length+' answered multiple choice questions.</p><div class="exfb-a">'
+    h+='<div class="excard exend"><div class="exend-t">Chapter '+c.n+' complete</div><p>'+p.ok+' correct out of '+c.items.filter(function(i){return exStatus(i);}).length+' exercises completed.</p><div class="exfb-a">'
       +'<button type="button" class="cta" data-act="exrestart" data-ch="'+c.n+'">Restart chapter</button>'
       +(nx?'<button type="button" class="cta pri" data-go="#/ex/'+nx.n+'">Next chapter ('+nx.n+') &rarr;</button>':'<button type="button" class="cta pri" data-go="#/ex">All chapters</button>')+'</div></div>';
   } else h+=exCardHtml(c,pos);
@@ -389,7 +403,7 @@ function exRefresh(n){
   var f=exFind(n); if(!f) return; var el=document.getElementById('explayer');
   if(el){ var t=document.createElement('div'); t.innerHTML=exPlayerHtml(f.c,f.pos); el.replaceWith(t.firstChild); }
   var sc=document.getElementById('ex-score'); if(sc){ var x=exScore(); sc.textContent=x.ok+' correct out of '+x.a+' answered'; }
-  var fb=document.querySelector('.exfb'); if(fb&&fb.scrollIntoView) fb.scrollIntoView({block:'nearest',behavior:'smooth'});
+  var fbs=document.querySelectorAll('.exfb'); var fb=fbs[fbs.length-1]; if(fb&&fb.scrollIntoView) fb.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 function vEx(ch,k){
   var E=exData();
@@ -422,7 +436,7 @@ document.addEventListener('keydown',function(e){
   if(!/^#\/ex\/\d+/.test(location.hash)||e.metaKey||e.ctrlKey||e.altKey) return;
   var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA') return;
   var k=e.key.toLowerCase(), idx='abcd'.indexOf(k); if(idx<0) idx=['1','2','3','4'].indexOf(k);
-  if(idx>=0){ var o=document.querySelectorAll('.excard .opt')[idx]; if(o){ o.click(); e.preventDefault(); } return; }
+  if(idx>=0){ var o=(document.querySelector('.excard .exp:not(.answered)')||document).querySelectorAll('.opt')[idx]; if(o){ o.click(); e.preventDefault(); } return; }
   if(e.key==='ArrowRight'||e.key==='Enter'){ var n=document.getElementById('exnext'); if(n&&e.target===document.body){ n.click(); e.preventDefault(); } }
   if(e.key==='ArrowLeft'){ var p=document.getElementById('exprev'); if(p){ p.click(); e.preventDefault(); } }
 });
@@ -1172,12 +1186,12 @@ document.addEventListener('click', function(e){
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
-        if(act==='exans'){ var xn=a.getAttribute('data-n'); store.exAns=store.exAns||{}; if(store.exAns[xn]===undefined){ store.exAns[xn]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
-    if(act==='exreset'){ var rn=a.getAttribute('data-n'); if(store.exAns) delete store.exAns[rn]; save(); exRefresh(rn); e.preventDefault(); return; }
+        if(act==='exans'){ var xn=a.getAttribute('data-n'), xk=a.getAttribute('data-key'); store.exAns=store.exAns||{}; if(store.exAns[xk]===undefined){ store.exAns[xk]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
+    if(act==='exreset'){ var rn=a.getAttribute('data-n'), rk=a.getAttribute('data-key'); if(store.exAns) delete store.exAns[rk]; save(); exRefresh(rn); e.preventDefault(); return; }
     if(act==='exsess'){ var sk=parseInt(a.getAttribute('data-s'),10); store.exSess=sk; save(); var L=exChaptersForSession(sk), tg=L[0]; for(var q=0;q<L.length;q++){ if(exFirstOpen(L[q])<L[q].items.length){ tg=L[q]; break; } } if(tg) location.hash='#/ex/'+tg.n; e.preventDefault(); return; }
     if(act==='exchap'){ store.exSess=null; save(); location.hash='#/ex/'+a.getAttribute('data-ch'); e.preventDefault(); return; }
     if(act==='exdone'){ var dn=a.getAttribute('data-n'); store.exDone=store.exDone||{}; if(store.exDone[dn]) delete store.exDone[dn]; else store.exDone[dn]=1; save(); exRefresh(dn); e.preventDefault(); return; }
-    if(act==='exrestart'){ var rc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(rc){ rc.items.forEach(function(i){ if(store.exAns) delete store.exAns[i.n]; if(store.exDone) delete store.exDone[i.n]; }); save(); location.hash='#/ex/'+rc.n+'/1'; render(); } e.preventDefault(); return; }
+    if(act==='exrestart'){ var rc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(rc){ rc.items.forEach(function(i){ exQs(i).forEach(function(q,j){ if(store.exAns) delete store.exAns[exKey(i,j)]; }); if(store.exDone) delete store.exDone[i.n]; }); save(); location.hash='#/ex/'+rc.n+'/1'; render(); } e.preventDefault(); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
