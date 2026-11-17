@@ -220,7 +220,7 @@ function parseHash(){
   if(p[0]==='pt'&&p[1]) return {page:'ptitem', item:p[1]};
   if(p[0]==='pt') return {page:'partiels'};
   if(p[0]==='moy') return {page:'moyennes'};
-  if(p[0]==='ex') return {page:'ex', ch:p[1]||null};
+  if(p[0]==='ex') return {page:'ex', ch:p[1]||null, k:p[2]||null};
   return {page:'home'};
 }
 function go(h){ location.hash = h; }
@@ -341,56 +341,91 @@ function vPtBlanc(it){
 var CR_SUPP={8:[{t:'IFRS 5 supplement',d:'Held for sale and discontinued operations, from the textbook',u:'fiches/cr-ifrs5.pdf'}],10:[{t:'IAS 2 supplement',d:'Inventories, from the textbook',u:'fiches/cr-ias2.pdf'}]};
 function exData(){ return D.EXERCISES || null; }
 function exDone(n){ return !!(store.exDone||{})[n]; }
-function exProgress(c){ var d=0; c.items.forEach(function(i){ if(exDone(i.n)) d++; }); return {done:d, total:c.items.length}; }
+function exAns(n){ return (store.exAns||{})[n]; }
+function exHas(n){ var a=exAns(n); return a!==undefined&&a!==null; }
+function exStatus(i){ if(i.q&&exHas(i.n)) return exAns(i.n)===i.q.k?'ok':'ko'; return exDone(i.n)?'done':''; }
+function exProgress(c){ var d=0,ok=0; c.items.forEach(function(i){ var st=exStatus(i); if(st) d++; if(st==='ok') ok++; }); return {done:d, total:c.items.length, ok:ok}; }
 function exTotals(){ var E=exData(), t=0, d=0; if(!E) return {done:0,total:0}; E.chapters.forEach(function(c){ var p=exProgress(c); t+=p.total; d+=p.done; }); return {done:d,total:t}; }
 function exChaptersForSession(n){ var E=exData(); if(!E) return []; var k=parseInt(n,10); return E.chapters.filter(function(c){ return c.s.indexOf(k)>=0; }); }
-function exAns(n){ return (store.exAns||{})[n]; }
-function exQHtml(i){
-  var q=i.q; if(!q) return '<div class="exq nq">No multiple choice version for this exercise'+(i.star?' (the book gives no answer, it is reserved for lecturers)':' (the book answer is a full worked solution)')+'. Work it out on paper, then check the book answer on PDF p. '+(i.a||'')+'.</div>';
-  var a=exAns(i.n), done=(a!==undefined&&a!==null);
-  var opts=q.c.map(function(t,j){
-    var cls='opt'; if(done){ if(j===q.k) cls+=' right'; else if(j===a) cls+=' wrong'; else cls+=' dim'; }
-    return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(t)+'</span></button>';
-  }).join('');
-  var fb=done?'<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'">Try again</button></div></div>':'';
-  return '<div class="exq" id="exq-'+i.n+'"><div class="exq-h">Multiple choice</div><div class="exq-s">'+esc(q.s)+'</div>'+opts+fb+'</div>';
+function exFind(n){ var E=exData(), r=null; E.chapters.forEach(function(c){ c.items.forEach(function(i,j){ if(i.n===n) r={c:c,pos:j,i:i}; }); }); return r; }
+function exScore(){ var E=exData(), a=0, ok=0; if(!E) return {a:0,ok:0}; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.q&&exHas(i.n)){ a++; if(exAns(i.n)===i.q.k) ok++; } }); }); return {a:a,ok:ok}; }
+function exSeqNext(c){ var ss=store.exSess; if(!ss) return null; var L=exChaptersForSession(ss), j=-1; L.forEach(function(x,t){ if(x.n===c.n) j=t; }); return j>=0&&j<L.length-1?L[j+1]:null; }
+function exSessions(){ var E=exData(), m={}; E.chapters.forEach(function(c){ c.s.forEach(function(k){ m[k]=1; }); }); return Object.keys(m).map(Number).sort(function(a,b){return a-b;}); }
+function exSessProg(k){ var d=0,t=0,ok=0; exChaptersForSession(k).forEach(function(c){ var p=exProgress(c); d+=p.done; t+=p.total; ok+=p.ok; }); return {done:d,total:t,ok:ok}; }
+function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items[j])) return j; } return c.items.length; }
+function exCardHtml(c,pos){
+  var i=c.items[pos], q=i.q, has=exHas(i.n), a=exAns(i.n), last=pos>=c.items.length-1;
+  var sq=last?exSeqNext(c):null, nextHref=sq?'#/ex/'+sq.n:'#/ex/'+c.n+'/'+(pos+2);
+  var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('');
+  var h='<div class="excard"><div class="exmeta"><b>Exercise '+i.n+'</b><span class="exk '+(i.k==='calculation'?'calc':'')+'">'+i.k+'</span><span>PDF p. '+i.p+'</span></div><div class="exstmt">'+body+'</div>';
+  if(q){
+    h+='<div class="exq-s">'+esc(q.s)+'</div>'+q.c.map(function(t,j){
+      var cls='opt'; if(has){ if(j===q.k) cls+=' right'; else if(j===a) cls+=' wrong'; else cls+=' dim'; }
+      return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(t)+'</span></button>';
+    }).join('');
+    if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div class="exfb-a"><button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'">Try again</button></div></div>';
+    else h+='<div class="exhint">Pick A to D. Keys A, B, C, D also work.</div>';
+  } else {
+    h+='<div class="exq nq">No multiple choice version for this exercise'+(i.star?' (the book gives no answer, it is reserved for lecturers)':' (the book answer is a full worked solution)')+'. Work it out on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>'
+      +'<div class="exfb-a"><button type="button" class="cta '+(exDone(i.n)?'':'pri')+'" data-act="exdone" data-n="'+i.n+'">'+(exDone(i.n)?'Done (tap to undo)':'Mark as done')+'</button><button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button></div>';
+  }
+  return h+'</div>';
 }
-function exFind(n){ var E=exData(), r=null; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.n===n) r=i; }); }); return r; }
-function exScore(){ var E=exData(), a=0, ok=0; if(!E) return {a:0,ok:0}; E.chapters.forEach(function(c){ c.items.forEach(function(i){ if(i.q){ var v=exAns(i.n); if(v!==undefined&&v!==null){ a++; if(v===i.q.k) ok++; } } }); }); return {a:a,ok:ok}; }
-function exRefresh(n){ var i=exFind(n), el=document.getElementById('exq-'+n); if(i&&el){ var t=document.createElement('div'); t.innerHTML=exQHtml(i); el.replaceWith(t.firstChild); } var sc=document.getElementById('ex-score'); if(sc){ var x=exScore(); sc.textContent=x.ok+' correct out of '+x.a+' answered'; } }
-function exToggle(el){
-  var n=el.getAttribute('data-n'), ch=el.getAttribute('data-ch');
-  store.exDone = store.exDone || {};
-  if(store.exDone[n]) delete store.exDone[n]; else store.exDone[n]=1;
-  save();
-  var row=el.closest('.exrow'); if(row) row.classList.toggle('done', !!store.exDone[n]);
-  var E=exData(), c=E.chapters.filter(function(x){ return String(x.n)===ch; })[0];
-  if(c){ var p=exProgress(c), t=document.getElementById('exc-'+ch); if(t) t.textContent=p.done+'/'+p.total; }
-  var tt=exTotals(), h=document.getElementById('ex-total'); if(h) h.textContent=tt.done+' done out of '+tt.total;
+function exPlayerHtml(c,pos){
+  var p=exProgress(c);
+  var dots=c.items.map(function(it,j){ return '<button type="button" class="exdot '+exStatus(it)+(j===pos?' cur':'')+'" data-go="#/ex/'+c.n+'/'+(j+1)+'" title="Exercise '+it.n+'">'+it.n.split('.')[1]+'</button>'; }).join('');
+  var h='<div id="explayer"><div class="exbar"><i style="width:'+Math.round(100*p.done/p.total)+'%"></i></div><div class="exdots">'+dots+'</div>';
+  if(pos>=c.items.length){
+    var E=exData(), nx=store.exSess?exSeqNext(c):E.chapters.filter(function(x){ return x.n===c.n+1; })[0];
+    h+='<div class="excard exend"><div class="exend-t">Chapter '+c.n+' complete</div><p>'+p.ok+' correct out of '+c.items.filter(function(i){return i.q&&exHas(i.n);}).length+' answered multiple choice questions.</p><div class="exfb-a">'
+      +'<button type="button" class="cta" data-act="exrestart" data-ch="'+c.n+'">Restart chapter</button>'
+      +(nx?'<button type="button" class="cta pri" data-go="#/ex/'+nx.n+'">Next chapter ('+nx.n+') &rarr;</button>':'<button type="button" class="cta pri" data-go="#/ex">All chapters</button>')+'</div></div>';
+  } else h+=exCardHtml(c,pos);
+  var prev=pos>0?'<button type="button" class="cta" id="exprev" data-go="#/ex/'+c.n+'/'+pos+'">&larr; Previous</button>':'<span></span>';
+  var skip=pos<c.items.length?'<button type="button" class="cta" data-go="#/ex/'+c.n+'/'+(pos+2)+'">Skip &rarr;</button>':'<span></span>';
+  return h+'<div class="exnav">'+prev+skip+'</div></div>';
 }
-function vEx(ch){
+function exRefresh(n){
+  var f=exFind(n); if(!f) return; var el=document.getElementById('explayer');
+  if(el){ var t=document.createElement('div'); t.innerHTML=exPlayerHtml(f.c,f.pos); el.replaceWith(t.firstChild); }
+  var sc=document.getElementById('ex-score'); if(sc){ var x=exScore(); sc.textContent=x.ok+' correct out of '+x.a+' answered'; }
+  var fb=document.querySelector('.exfb'); if(fb&&fb.scrollIntoView) fb.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function vEx(ch,k){
   var E=exData();
   if(!E) return '<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button><div class="page-h">Textbook exercises</div><div class="card"><p>Data unavailable.</p></div>';
-  var tt=exTotals();
-  var chips=E.chapters.map(function(c){ return '<button class="pill'+(String(c.n)===String(ch)?' on':'')+'" data-go="#/ex/'+c.n+'">'+c.n+'</button>'; }).join('');
+  var tt=exTotals(), sc=exScore();
+  var c=ch?E.chapters.filter(function(x){ return String(x.n)===String(ch); })[0]:null;
+  if(c){
+    var pos=k?Math.max(0,Math.min(c.items.length,parseInt(k,10)-1)):exFirstOpen(c);
+    return '<button class="back" data-go="#/ex">&larr; All chapters</button>'
+      + '<div class="page-h">Chapter '+c.n+' &middot; '+esc(c.t)+'</div>'
+      + '<div class="page-sub">'+c.items.length+' exercises'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
+      + (CR_SUPP[c.n]||[]).map(function(f){ return '<div class="exsupp"><a href="'+f.u+'?v=20261116" target="_blank" rel="noopener"><b>'+f.t+'</b></a> &middot; '+f.d+'</div>'; }).join('')
+      + exPlayerHtml(c,pos);
+  }
   var h='<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button>'
     + '<div class="page-h">Textbook exercises</div>'
-    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.total+' exercises &middot; <span id="ex-total">'+tt.done+' done out of '+tt.total+'</span> &middot; <span id="ex-score">'+exScore().ok+' correct out of '+exScore().a+' answered</span></div>'
-    + '<div class="card" style="margin-bottom:16px"><p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6">'+esc(E.note)+' Page shown is the PDF page (printed book page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'. Exercises marked with a star have no answer in the book, it is reserved for lecturers, so their multiple choice answers were worked out separately or are left without one.</p>'
-    + '<div class="expills">'+chips+'</div></div>';
+    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.done+' of '+tt.total+' done &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
+    + '<div class="exnote">One exercise at a time, as in the book. Pick an answer, read the explanation, move on. Page numbers are PDF pages (printed page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'.</div>'
+    + '<div class="exsh">By session, all exercises in one run</div><div class="exgrid">'
+    + exSessions().map(function(k){ var p=exSessProg(k), L=exChaptersForSession(k); return '<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exsess" data-s="'+k+'"><span class="exn">'+k+'</span><span class="ext"><b>Session '+k+'</b><small>Chapter'+(L.length>1?'s ':' ')+L.map(function(c){return c.n;}).join(', ')+' &middot; '+p.done+'/'+p.total+' done</small><span class="exbar"><i style="width:'+Math.round(100*p.done/p.total)+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>'; }).join('')
+    + '</div><div class="exsh">By chapter</div><div class="exgrid">';
   E.chapters.forEach(function(c){
-    var p=exProgress(c), open=String(c.n)===String(ch);
-    h+='<details class="card exch"'+(open?' open':'')+' id="exch-'+c.n+'"><summary><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+c.items.length+' exercises'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; PDF p. '+c.items[0].p+'</small></span><span class="exc" id="exc-'+c.n+'">'+p.done+'/'+p.total+'</span></summary>'
-      + (CR_SUPP[c.n]||[]).map(function(f){ return '<div class="exbody" style="display:block;padding:10px 18px"><a href="'+f.u+'?v=20261116" target="_blank" rel="noopener"><b>'+f.t+'</b></a> &middot; '+f.d+'</div>'; }).join('')
-      + c.items.map(function(i){
-          var ans = i.star ? '<span class="exa star" title="answer reserved for lecturers">* no book answer</span>' : (i.a ? '<span class="exa">answer p. '+i.a+'</span>' : '');
-          var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('')+exQHtml(i);
-          return '<div class="exwrap"><label class="exrow'+(exDone(i.n)?' done':'')+'"><input type="checkbox" data-act="extoggle" data-n="'+i.n+'" data-ch="'+c.n+'"'+(exDone(i.n)?' checked':'')+'><span class="exr-t"><b>'+i.n+'</b> '+esc(i.l)+'</span><span class="exr-m"><span class="exk '+(i.k==='calcul'?'calc':'')+'">'+i.k+'</span>PDF p. '+i.p+ans+'<button type="button" class="exshow" data-act="exshow">Open</button></span></label><div class="exbody" hidden>'+body+'</div></div>';
-        }).join('')
-      + '</details>';
+    var p=exProgress(c), pct=Math.round(100*p.done/p.total), st=p.done===0?'Start':(p.done>=p.total?'Review':'Resume');
+    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+st+' &rarr;</span></button>';
   });
-  return h;
+  return h+'</div>';
 }
+
+document.addEventListener('keydown',function(e){
+  if(!/^#\/ex\/\d+/.test(location.hash)||e.metaKey||e.ctrlKey||e.altKey) return;
+  var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA') return;
+  var k=e.key.toLowerCase(), idx='abcd'.indexOf(k); if(idx<0) idx=['1','2','3','4'].indexOf(k);
+  if(idx>=0){ var o=document.querySelectorAll('.excard .opt')[idx]; if(o){ o.click(); e.preventDefault(); } return; }
+  if(e.key==='ArrowRight'||e.key==='Enter'){ var n=document.getElementById('exnext'); if(n&&e.target===document.body){ n.click(); e.preventDefault(); } }
+  if(e.key==='ArrowLeft'){ var p=document.getElementById('exprev'); if(p){ p.click(); e.preventDefault(); } }
+});
 
 /* ---------- DEADLINES ---------- */
 function allDeadlines(){
@@ -639,7 +674,7 @@ function vSession(cid, n){
     ? '<a class="tile" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+s.key+'"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>'+(seen?'Vue &middot; ':'')+'PDF, resume complet</span><span class="arrow">Ouvrir la fiche &rarr;</span></a>'
     : '<span class="tile off"><span class="ic">'+IC.pdf+'</span><b>Fiche de session</b><span>Pas encore disponible</span></span>')
   + (levelBank(cid,s.key).length ? levelTiles(cid,s.key) : legacyTiles(cid,s.key))
-  + (cid==='cr' ? exChaptersForSession(s.key).map(function(c){ var p=exProgress(c); return '<div class="tile" data-go="#/ex/'+c.n+'"><span class="ic">'+IC.sheet+'</span><b>Textbook exercises &middot; chapter '+c.n+'</b><span>'+esc(c.t)+' &middot; '+p.done+'/'+p.total+' done</span><span class="arrow">Open &rarr;</span></div>'; }).join('') : '')
+  + (cid==='cr' ? exChaptersForSession(s.key).map(function(c){ var p=exProgress(c); return '<div class="tile" data-act="exsess" data-s="'+s.key+'"><span class="ic">'+IC.sheet+'</span><b>Textbook exercises &middot; chapter '+c.n+'</b><span>'+esc(c.t)+' &middot; '+p.done+'/'+p.total+' done</span><span class="arrow">Open &rarr;</span></div>'; }).join('') : '')
   + (nbCards ? '<div class="tile" data-go="#/f/'+cid+'/'+s.key+'"><span class="ic">'+IC.card+'</span><b>Flashcards</b><span>'+nbCards+' cartes &middot; '+fcKnown(cid,n)+' connues</span><span class="arrow">Reviser &rarr;</span></div>' : '')
   + '</div>'
   + (levelBank(cid,s.key).length && setsOf(cid,s.key).length ? '<details class="card"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700">Anciens QCM et progression conservee</summary><p>Les nouveaux niveaux ont leurs propres questions. Vos anciennes reponses restent ici, sans etre attribuees aux nouvelles questions.</p><div class="tiles">'+legacyTiles(cid,s.key)+'</div></details>' : '')
@@ -1108,7 +1143,7 @@ function render(){
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
     case 'moyennes': content = vMoyennes(); break;
-    case 'ex': content = vEx(r.ch); break;
+    case 'ex': content = vEx(r.ch, r.k); break;
     default: content = vHome();
   }
   root.innerHTML = shell(content, r);
@@ -1137,10 +1172,12 @@ document.addEventListener('click', function(e){
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
-    if(act==='extoggle'){ exToggle(a); return; }
-    if(act==='exans'){ var xn=a.getAttribute('data-n'); store.exAns=store.exAns||{}; if(store.exAns[xn]===undefined){ store.exAns[xn]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
+        if(act==='exans'){ var xn=a.getAttribute('data-n'); store.exAns=store.exAns||{}; if(store.exAns[xn]===undefined){ store.exAns[xn]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
     if(act==='exreset'){ var rn=a.getAttribute('data-n'); if(store.exAns) delete store.exAns[rn]; save(); exRefresh(rn); e.preventDefault(); return; }
-    if(act==='exshow'){ var w=a.closest('.exwrap'), bd=w&&w.querySelector('.exbody'); if(bd){ bd.hidden=!bd.hidden; a.textContent=bd.hidden?'Open':'Hide'; a.classList.toggle('on',!bd.hidden); } e.preventDefault(); return; }
+    if(act==='exsess'){ var sk=parseInt(a.getAttribute('data-s'),10); store.exSess=sk; save(); var L=exChaptersForSession(sk), tg=L[0]; for(var q=0;q<L.length;q++){ if(exFirstOpen(L[q])<L[q].items.length){ tg=L[q]; break; } } if(tg) location.hash='#/ex/'+tg.n; e.preventDefault(); return; }
+    if(act==='exchap'){ store.exSess=null; save(); location.hash='#/ex/'+a.getAttribute('data-ch'); e.preventDefault(); return; }
+    if(act==='exdone'){ var dn=a.getAttribute('data-n'); store.exDone=store.exDone||{}; if(store.exDone[dn]) delete store.exDone[dn]; else store.exDone[dn]=1; save(); exRefresh(dn); e.preventDefault(); return; }
+    if(act==='exrestart'){ var rc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(rc){ rc.items.forEach(function(i){ if(store.exAns) delete store.exAns[i.n]; if(store.exDone) delete store.exDone[i.n]; }); save(); location.hash='#/ex/'+rc.n+'/1'; render(); } e.preventDefault(); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
