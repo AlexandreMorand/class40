@@ -359,6 +359,11 @@ function exSeqNext(c){ var ss=store.exSess; if(!ss) return null; var L=exChapter
 function exSessions(){ var E=exData(), m={}; E.chapters.forEach(function(c){ c.s.forEach(function(k){ m[k]=1; }); }); return Object.keys(m).map(Number).sort(function(a,b){return a-b;}); }
 function exSessProg(k){ var d=0,t=0,ok=0; exChaptersForSession(k).forEach(function(c){ var p=exProgress(c); d+=p.done; t+=p.total; ok+=p.ok; }); return {done:d,total:t,ok:ok}; }
 function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items[j])) return j; } return c.items.length; }
+function exExp(e){
+  var L=String(e).split('\n'), h='<span class="exlead">'+esc(L[0])+'</span>';
+  if(L.length>1) h+='<div class="exw">'+L.slice(1).map(function(l){ var m=l.match(/^(Step \d+\.)\s*(.*)$/); return '<div class="exws">'+(m?'<b>'+esc(m[1])+'</b> '+esc(m[2]):esc(l))+'</div>'; }).join('')+'</div>';
+  return h;
+}
 function exCardHtml(c,pos){
   var i=c.items[pos], qs=exQs(i), last=pos>=c.items.length-1, multi=qs.length>1;
   var sq=last?exSeqNext(c):null, nextHref=sq?'#/ex/'+sq.n:'#/ex/'+c.n+'/'+(pos+2);
@@ -373,7 +378,7 @@ function exCardHtml(c,pos){
         var cls='opt'; if(has){ if(m===q.k) cls+=' right'; else if(m===a) cls+=' wrong'; else cls+=' dim'; }
         return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-key="'+key+'" data-i="'+m+'"><span class="k">'+'ABCD'[m]+'</span><span>'+esc(t)+'</span></button>';
       }).join('');
-      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+esc(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div></div>';
+      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div></div>';
       h+='</div>';
     });
     if(i.np&&i.np.length) h+='<div class="exq nq">No multiple choice for part'+(i.np.length>1?'s ':' ')+i.np.map(function(x){return '('+x+')';}).join(', ')+' (calculation or worked solution). Work '+(i.np.length>1?'them':'it')+' on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>';
