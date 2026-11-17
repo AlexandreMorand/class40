@@ -427,12 +427,16 @@ function vEx(ch,k){
     + '<div class="page-h">Textbook exercises</div>'
     + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.done+' of '+tt.total+' done &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
     + '<div class="exnote">One exercise at a time, as in the book. Pick an answer, read the explanation, move on. Page numbers are PDF pages (printed page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'.</div>'
-    + '<div class="exsh">By session, all exercises in one run</div><div class="exgrid">'
-    + exSessions().map(function(k){ var p=exSessProg(k), L=exChaptersForSession(k); return '<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exsess" data-s="'+k+'"><span class="exn">'+k+'</span><span class="ext"><b>Session '+k+'</b><small>Chapter'+(L.length>1?'s ':' ')+L.map(function(c){return c.n;}).join(', ')+' &middot; '+p.done+'/'+p.total+' done</small><span class="exbar"><i style="width:'+Math.round(100*p.done/p.total)+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>'; }).join('')
-    + '</div><div class="exsh">By chapter</div><div class="exgrid">';
+    + '<div class="exsh">By book chapter</div><div class="exgrid">';
   E.chapters.forEach(function(c){
     var p=exProgress(c), pct=Math.round(100*p.done/p.total), st=p.done===0?'Start':(p.done>=p.total?'Review':'Resume');
-    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn">'+c.n+'</span><span class="ext"><b>'+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+st+' &rarr;</span></button>';
+    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn" title="Chapter '+c.n+'">'+c.n+'</span><span class="ext"><b>Chapter '+c.n+' &middot; '+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done'+(c.s.length?' &middot; course session'+(c.s.length>1?'s ':' ')+c.s.join(', '):' &middot; not tied to a session')+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+st+' &rarr;</span></button>';
+  });
+  h+='</div><div class="exsh">By course session, all its exercises in one run</div><div class="exgrid">';
+  var groups=[]; exSessions().forEach(function(k){ var key=exChaptersForSession(k).map(function(c){return c.n;}).join(','); var g=groups[groups.length-1]; if(g&&g.key===key&&g.b===k-1) g.b=k; else groups.push({key:key,a:k,b:k}); });
+  groups.forEach(function(g){
+    var p=exSessProg(g.a), L=exChaptersForSession(g.a), pct=Math.round(100*p.done/p.total), lbl=g.a===g.b?'Session '+g.a:'Sessions '+g.a+' to '+g.b;
+    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exsess" data-s="'+g.a+'"><span class="exn ses">'+(g.a===g.b?'S'+g.a:'S'+g.a+'-'+g.b)+'</span><span class="ext"><b>'+lbl+'</b><small>'+L.map(function(c){return 'Chapter '+c.n+' '+esc(c.t);}).join(' and ')+' &middot; '+p.done+'/'+p.total+' done</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>';
   });
   return h+'</div>';
 }
