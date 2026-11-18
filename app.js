@@ -537,24 +537,74 @@ function vEx(ch,k){
       + (CR_SUPP[c.n]||[]).map(function(f){ return '<div class="exsupp"><a href="'+f.u+'?v=20261116" target="_blank" rel="noopener"><b>'+f.t+'</b></a> &middot; '+f.d+'</div>'; }).join('')
       + exPlayerHtml(c,pos);
   }
+  return exIndexHtml(E,tt,sc);
+}
+/* ---- accueil des exercices : par session du cours, jamais par chapitre du livre en premier ---- */
+function crSessionList(){ return sessionsOf('cr').filter(function(x){ return x.n; }); }
+function exSeenSession(){
+  var v=(store.seen||{}).cr; if(v) return {n:v, auto:false};
+  var best=0;
+  Object.keys(store.fiches||{}).forEach(function(k){ var m=k.match(/^cr-(\d+)$/); if(m) best=Math.max(best,parseInt(m[1],10)); });
+  store.attempts.forEach(function(a){ if(a.course==='cr'){ var n=parseInt(a.session,10); if(n) best=Math.max(best,n); } });
+  if(!best){ var now=Date.now(); crSessionList().forEach(function(x){ if(x.date && new Date(x.date).getTime()<=now) best=Math.max(best,x.n); }); }
+  return {n:best||1, auto:true};
+}
+function exGroups(){
+  var groups=[];
+  exSessions().forEach(function(k){
+    var L=exChaptersForSession(k), key=L.map(function(c){return c.n;}).join(',');
+    var g=groups[groups.length-1];
+    if(g && g.key===key && g.b===k-1) g.b=k; else groups.push({key:key,a:k,b:k,chs:L});
+  });
+  return groups;
+}
+function exGroupStats(g){
+  var d=0,t=0,ok=0,wrong=0,firstWrong=null;
+  g.chs.forEach(function(c){ var p=exProgress(c); d+=p.done; t+=p.total; ok+=p.ok;
+    c.items.forEach(function(i,pos){ if(exQs(i).some(function(q,j){ var k=exKey(i,j); return exHas(k) && exAns(k)!==q.k; })){ wrong++; if(!firstWrong) firstWrong={c:c,pos:pos}; } }); });
+  return {done:d,total:t,ok:ok,wrong:wrong,firstWrong:firstWrong};
+}
+function exGroupRow(g, kind){
+  var st=exGroupStats(g), pct=st.total?Math.round(100*st.done/st.total):0;
+  var lbl=g.a===g.b?'Session '+g.a:'Sessions '+g.a+' to '+g.b;
+  var titles=crSessionList().filter(function(x){ return x.n>=g.a && x.n<=g.b; }).map(function(x){ return x.title; });
+  var ttl=titles.length===1?titles[0]:g.chs.map(function(c){ return c.t; }).join(' and ');
+  var act=st.done===0?'Start':(st.done>=st.total?'Review':'Continue');
+  var cls='exchc'+(st.done>=st.total?' full':'')+(kind==='next'?' exnext':'')+(kind==='later'?' exdim':'');
+  var wr=st.wrong?' <span class="exwr">'+st.wrong+' wrong</span>':'';
+  return '<button type="button" class="'+cls+'" data-act="exsess" data-s="'+g.a+'"><span class="exn ses">'+(g.a===g.b?'S'+g.a:'S'+g.a+'-'+g.b)+'</span><span class="ext"><b>'+lbl+' &middot; '+esc(ttl)+'</b><small>Book chapter'+(g.chs.length>1?'s ':' ')+g.chs.map(function(c){return c.n;}).join(', ')+' &middot; '+st.done+'/'+st.total+' done'+wr+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+(kind==='later'?'Not seen yet':act)+' &rarr;</span></button>';
+}
+function exIndexHtml(E,tt,sc){
+  var seen=exSeenSession(), groups=exGroups();
+  var past=groups.filter(function(g){ return g.a<=seen.n; }), later=groups.filter(function(g){ return g.a>seen.n; });
+  var nextG=null; past.forEach(function(g){ var st=exGroupStats(g); if(!nextG && st.done<st.total) nextG=g; });
+  var opts=crSessionList().map(function(x){ return '<option value="'+x.n+'"'+(x.n===seen.n?' selected':'')+'>Session '+x.n+' &middot; '+esc(x.title.length>58?x.title.slice(0,56)+'...':x.title)+'</option>'; }).join('');
+  var mist=exMistakes();
   var h='<button class="back" data-go="#/c/cr">&larr; Corporate Reporting</button>'
-    + '<div class="page-h">Textbook exercises</div>'
-    + '<div class="page-sub">'+esc(E.book)+' &middot; '+tt.done+' of '+tt.total+' done &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
-    + '<div class="exnote">One exercise at a time, as in the book. Pick an answer, read the explanation, move on. Page numbers are PDF pages (printed page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'.</div>'
-    + '<div class="exsh">By book chapter</div><div class="exgrid">';
-  E.chapters.forEach(function(c){
-    var p=exProgress(c), pct=Math.round(100*p.done/p.total), st=p.done===0?'Start':(p.done>=p.total?'Review':'Resume');
-    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn" title="Chapter '+c.n+'">'+c.n+'</span><span class="ext"><b>Chapter '+c.n+' &middot; '+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done'+(c.s.length?' &middot; course session'+(c.s.length>1?'s ':' ')+c.s.join(', '):' &middot; not tied to a session')+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+st+' &rarr;</span></button>';
-  });
-  h+='</div><div class="exsh">By course session, all its exercises in one run</div><div class="exgrid">';
-  var groups=[]; exSessions().forEach(function(k){ var key=exChaptersForSession(k).map(function(c){return c.n;}).join(','); var g=groups[groups.length-1]; if(g&&g.key===key&&g.b===k-1) g.b=k; else groups.push({key:key,a:k,b:k}); });
-  groups.forEach(function(g){
-    var p=exSessProg(g.a), L=exChaptersForSession(g.a), pct=Math.round(100*p.done/p.total), lbl=g.a===g.b?'Session '+g.a:'Sessions '+g.a+' to '+g.b;
-    h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exsess" data-s="'+g.a+'"><span class="exn ses">'+(g.a===g.b?'S'+g.a:'S'+g.a+'-'+g.b)+'</span><span class="ext"><b>'+lbl+'</b><small>'+L.map(function(c){return 'Chapter '+c.n+' '+esc(c.t);}).join(' and ')+' &middot; '+p.done+'/'+p.total+' done</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>';
-  });
-  return h+'</div>';
+    + '<div class="page-h">Textbook exercises, by course session</div>'
+    + '<div class="page-sub">'+tt.done+' of '+tt.total+' done &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
+    + '<div class="card exseen"><h2>Where are you in the course?</h2><p style="font-size:13px;color:var(--muted);margin:0 0 10px">Only the sessions you have already followed are open for practice, so you never work on a topic before seeing it. '+(seen.auto?'This is a guess from your activity, set it to where you really are.':'Change it as soon as you catch up.')+'</p>'
+    + '<select id="exSeen" class="exsel">'+opts+'</select><div class="exlast">Last session followed</div></div>';
+  if(mist.length) h+='<div class="exmistbar"><b>'+mist.length+' exercise'+(mist.length>1?'s':'')+' answered wrongly.</b> Redo them before moving on. <button type="button" class="cta pri" style="padding:8px 14px;font-size:12.5px" data-go="#/ex/'+mist[0].c.n+'/'+(mist[0].pos+1)+'">Redo my mistakes</button></div>';
+  h+='<div class="exsh">Sessions you have followed</div><div class="exgrid">';
+  if(!past.length) h+='<div class="exnote">No exercises yet for the sessions followed so far.</div>';
+  past.forEach(function(g){ h+=exGroupRow(g, g===nextG?'next':''); });
+  h+='</div>';
+  if(later.length){
+    h+='<div class="exsh">Coming up, wait for the lecture</div><div class="exgrid">';
+    later.forEach(function(g){ h+=exGroupRow(g,'later'); });
+    h+='</div>';
+  }
+  var loose=E.chapters.filter(function(c){ return !c.s.length; });
+  h+='<details class="exdet"><summary>Other chapters, not covered by a lecture session ('+loose.length+')</summary><div class="exgrid">';
+  loose.forEach(function(c){ var p=exProgress(c), pct=Math.round(100*p.done/p.total); h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn">'+c.n+'</span><span class="ext"><b>Chapter '+c.n+' &middot; '+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>'; });
+  h+='</div></details>';
+  h+='<details class="exdet"><summary>Browse by book chapter</summary><div class="exnote">Page numbers are PDF pages (printed page = PDF page minus '+E.offset+'). Answers: '+esc(E.ansPart)+'.</div><div class="exgrid">';
+  E.chapters.forEach(function(c){ var p=exProgress(c), pct=Math.round(100*p.done/p.total); h+='<button type="button" class="exchc'+(p.done>=p.total?' full':'')+'" data-act="exchap" data-ch="'+c.n+'"><span class="exn">'+c.n+'</span><span class="ext"><b>Chapter '+c.n+' &middot; '+esc(c.t)+'</b><small>'+p.done+'/'+p.total+' done'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+'</small><span class="exbar"><i style="width:'+pct+'%"></i></span></span><span class="exgo">'+(p.done===0?'Start':p.done>=p.total?'Review':'Resume')+' &rarr;</span></button>'; });
+  return h+'</div></details>';
 }
 
+document.addEventListener('change',function(e){ var t=e.target; if(t&&t.id==='exSeen'){ store.seen=store.seen||{}; store.seen.cr=parseInt(t.value,10); save(); render(); } });
 document.addEventListener('keydown',function(e){
   if(!/^#\/ex\/\d+/.test(location.hash)||e.metaKey||e.ctrlKey||e.altKey) return;
   var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA') return;
@@ -784,7 +834,7 @@ function vHome(){
   + homeSec('S&#39;entrainer','choisis ton mode de travail')
   + '<div class="hmgrid">'
   + homeTile('#/qb','QCM a la carte','matiere, difficulte, sessions au choix',IC.card)
-  + (exT ? homeTile('#/ex','Exercices du livre','CR &middot; '+exT.done+' sur '+exT.total+' faits, un par un',IC.sheet) : '')
+  + (exT ? homeTile('#/ex','Exercices par session','CR &middot; dans l&#39;ordre du cours, '+exT.done+' sur '+exT.total+' faits',IC.sheet) : '')
   + homeTile('#/pt','Mocks et partiels blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
   + homeTile('#/f/'+state.course,'Flashcards','revision espacee de '+esc(c.name),IC.card)
   + homeTile('#/cs/'+state.course,'Synthese du cours','formules et definitions de '+esc(c.name),IC.sheet)
