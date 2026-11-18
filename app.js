@@ -485,8 +485,9 @@ function exExp(e){
   }).join('')+'</div>';
   return h;
 }
-function exMethHtml(c,i){
+function exMethHtml(c,i,q){
   var M=D.EX_METHODS; if(!M || i.k!=='calculation') return '';
+  if(q && !/\d[\d,.]*\d/.test(q.s||'')) return '';
   var keys=(M.byEx&&M.byEx[i.n])||(M.byChapter&&M.byChapter[String(c.n)])||[];
   var cards=keys.map(function(k){ return M.cards[k]; }).filter(Boolean);
   if(!cards.length) return '';
@@ -508,7 +509,7 @@ function exCardHtml(c,pos){
         var cls='opt'; if(has){ if(m===q.k) cls+=' right'; else if(m===a) cls+=' wrong'; else cls+=' dim'; }
         return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-key="'+key+'" data-i="'+m+'"><span class="k">'+'ABCD'[m]+'</span><span>'+esc(t)+'</span></button>';
       }).join('');
-      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div>'+exMethHtml(c,i)+'</div>';
+      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div>'+exMethHtml(c,i,q)+'</div>';
       h+='</div>';
     });
     if(multi&&qs.some(function(q,j){return exHas(exKey(i,j));})) h+='<div class="exfb-a"><button type="button" class="exshow" data-act="exredo" data-n="'+i.n+'">Redo the whole exercise</button></div>';
