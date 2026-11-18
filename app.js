@@ -478,12 +478,20 @@ function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items
 function exExp(e){
   var L=String(e).split('\n'), h='<span class="exlead">'+esc(L[0])+'</span>';
   if(L.length>1) h+='<div class="exw">'+L.slice(1).map(function(l){
-    var m=l.match(/^(Step \d+\.|Principle(?: \([^)]*\))?\.|Reading\.|Check[^:.]*[:.]|Evidence\.|Reasoning\.|Also useful:|Note:)\s*(.*)$/);
+    var m=l.match(/^(Step \d+\.|In plain words\.|Principle(?: \([^)]*\))?\.|Reading\.|Check[^:.]*[:.]|Evidence\.|Reasoning\.|Also useful:|Note:)\s*(.*)$/);
     if(m) return '<div class="exws"><b>'+esc(m[1])+'</b> '+esc(m[2])+'</div>';
     if(/^Wrong /.test(l)) return '<div class="exws exbad">'+esc(l)+'</div>';
     return '<div class="exws">'+esc(l)+'</div>';
   }).join('')+'</div>';
   return h;
+}
+function exMethHtml(c,i){
+  var M=D.EX_METHODS; if(!M || i.k!=='calculation') return '';
+  var keys=(M.byEx&&M.byEx[i.n])||(M.byChapter&&M.byChapter[String(c.n)])||[];
+  var cards=keys.map(function(k){ return M.cards[k]; }).filter(Boolean);
+  if(!cards.length) return '';
+  return '<details class="exmeth"><summary>Not sure about the method? Read the plain-English recap ('+cards.map(function(x){ return esc(x.t.replace(/ in plain words$/,'')); }).join(' / ')+')</summary>'
+    + cards.map(function(x){ return '<div class="exmcard"><h4>'+esc(x.t)+'</h4>'+x.b.map(function(p){ return '<p>'+esc(p)+'</p>'; }).join('')+'</div>'; }).join('')+'</details>';
 }
 function exCardHtml(c,pos){
   var i=c.items[pos], qs=exQs(i), last=pos>=c.items.length-1, multi=qs.length>1;
@@ -500,7 +508,7 @@ function exCardHtml(c,pos){
         var cls='opt'; if(has){ if(m===q.k) cls+=' right'; else if(m===a) cls+=' wrong'; else cls+=' dim'; }
         return '<button type="button" class="'+cls+'" data-act="exans" data-n="'+i.n+'" data-key="'+key+'" data-i="'+m+'"><span class="k">'+'ABCD'[m]+'</span><span>'+esc(t)+'</span></button>';
       }).join('');
-      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div></div>';
+      if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div>'+exMethHtml(c,i)+'</div>';
       h+='</div>';
     });
     if(i.np&&i.np.length) h+='<div class="exq nq">No multiple choice for part'+(i.np.length>1?'s ':' ')+i.np.map(function(x){return '('+x+')';}).join(', ')+' (calculation or worked solution). Work '+(i.np.length>1?'them':'it')+' on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>';
