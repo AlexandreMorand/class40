@@ -338,6 +338,118 @@ function vPtBlanc(it){
 }
 
 
+/* ---------- TABLEAUX DES EXERCICES (texte aligne -> vrai tableau HTML) ---------- */
+function exParseTable(txt){
+  var NUM=/^(\(?[-–]?[£$€]?\d[\d,\.]*[kmKM%]?\)?|[£$€]\d*[kmKM]?|[-–]|nil|n\/a)$/i;
+  var RULE=/^[\s–—\-=_─]+$/;
+  var lines=String(txt).replace(/\t/g,'    ').split('\n'), rows=[], rule=null;
+  lines.forEach(function(raw){
+    var ln=raw.replace(/\s+$/,''), isSec=false;
+    if(ln.charAt(0)==='\u0001'){ ln=ln.slice(1); isSec=true; }
+    if(!ln.trim()) return;
+    if(RULE.test(ln) && /[–—=_]{2,}|-{3,}/.test(ln)){ rule = /=/.test(ln) ? 'dbl' : 'sgl'; return; }
+    var cells=[], re=/\S+(?: \S+)*/g, m;
+    while((m=re.exec(ln))){ cells.push({t:m[0], s:m.index, e:m.index+m[0].length}); }
+    /* chunks separes par 2 espaces ou plus : decouper les chunks qui sont des suites de nombres */
+    var out=[];
+    cells.forEach(function(c){
+      var toks=c.t.split(' ');
+      if(toks.every(function(t){ return NUM.test(t); }) && toks.length>1){
+        var pos=c.s; toks.forEach(function(t){ out.push({t:t,s:pos,e:pos+t.length,num:true}); pos+=t.length+1; });
+      } else { c.num = NUM.test(c.t); out.push(c); }
+    });
+    /* libelle suivi d'un seul espace puis d'un nombre : separer le dernier jeton */
+    if(out.length===1 && !out[0].num){
+      var tk=out[0].t.split(' ');
+      if(tk.length>=2){ var last=tk[tk.length-1]; if(NUM.test(last) && /[,\(\.%]/.test(last) && !/^\d{4}$/.test(last)){
+        var c0=out[0]; var lab=tk.slice(0,-1).join(' ');
+        out=[{t:lab,s:c0.s,e:c0.s+lab.length,num:false},{t:last,s:c0.e-last.length,e:c0.e,num:true}];
+      } }
+    }
+    if(isSec){
+      var mm=ln.trim().match(/^([\d,\.\(\)]+)\s+([A-Za-z].*)$/);
+      if(mm){ rows.push({cells:[{t:mm[1],s:0,e:0,num:true,guess:true}], rule:null, indent:0, raw:mm[1]}); ln=mm[2]; }
+      out=[{t:ln.trim(),s:0,e:ln.trim().length,num:false}];
+    }
+    rows.push({cells:out, rule:rule, indent:(out[0]?out[0].s:0), raw:ln, sec:isSec}); rule=null;
+  });
+  if(rule && rows.length) rows[rows.length-1].after=rule;
+  return rows;
+}
+function exTableHtml(txt){
+  var rows=exParseTable(txt);
+  if(rows.length<2) return null;
+  /* centres des colonnes de valeurs = bords droits regroupes */
+  var edges=[];
+  rows.forEach(function(r){ r.cells.forEach(function(c,i){ if(c.num && !c.guess) edges.push(c.e); }); });
+  edges.sort(function(a,b){ return a-b; });
+  var cols=[];
+  edges.forEach(function(e){ var L=cols[cols.length-1]; if(L && e-L.max<=3){ L.max=e; L.n++; L.sum+=e; } else cols.push({min:e,max:e,n:1,sum:e}); });
+  cols=cols.filter(function(c){ return c.n>=1; }).map(function(c){ return c.sum/c.n; });
+  if(!cols.length || cols.length>8) return null;
+  function colOf(c){ if(c.guess) return Math.min(1,cols.length-1); var ctr=c.num?c.e:(c.s+c.e)/2, best=0, bd=1e9; cols.forEach(function(x,i){ var d=Math.abs(x-ctr); if(d<bd){ bd=d; best=i; } }); return best; }
+  var valueRows=0, minInd=1e9;
+  rows.forEach(function(r){ var lab=r.cells[0]&&!r.cells[0].num; if(r.cells.some(function(c){return c.num;})) valueRows++; if(lab) minInd=Math.min(minInd,r.indent); });
+  if(valueRows<1) return null;
+  var h='<div class="extw"><table class="extb" data-cols="'+cols.length+'"><tbody>';
+  rows.forEach(function(r,ri){
+    var hasNum=r.cells.some(function(c){ return c.num; });
+    var first=r.cells[0], hasLab=first && !first.num;
+    var isHead=!hasLab && ri<=2 && !r.cells.some(function(c){ return /\d{2},?\d{3}|\d{3,}\./.test(c.t); }) ;
+    var cls=(r.rule?' r-'+r.rule:'')+(r.after==='dbl'?' a-dbl':'')+(isHead?' hd':'');
+    if(r.sec || (!hasNum && hasLab && r.cells.length===1)){
+      var lv=Math.min(3,Math.max(0,Math.round((r.indent-(minInd===1e9?0:minInd))/3)));
+      h+='<tr class="'+cls+' sec"><td colspan="'+(cols.length+1)+'" style="padding-left:'+(10+lv*14)+'px">'+esc(first.t)+'</td></tr>'; return;
+    }
+    var vals=new Array(cols.length), label='';
+    r.cells.forEach(function(c,i){
+      if(i===0 && hasLab){ label=c.t; return; }
+      var k=colOf(c);
+      if(vals[k]===undefined) vals[k]={t:c.t,num:c.num}; else vals[k].t+=' '+c.t;
+    });
+    var lv2=Math.min(3,Math.max(0,Math.round((r.indent-(minInd===1e9?0:minInd))/3)));
+    h+='<tr class="'+cls+'"><td class="lb" style="padding-left:'+(10+(hasLab?lv2*14:0))+'px">'+esc(label)+'</td>';
+    for(var k=0;k<cols.length;k++){ var v=vals[k]; h+='<td class="nm'+(v&&!v.num?' tx':'')+'">'+(v?esc(v.t):'')+'</td>'; }
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function exTableMaxCols(h){ var m=h&&h.match(/data-cols="(\d+)"/); return m?parseInt(m[1],10):0; }
+function exBodyHtml(b){
+  var out='', i=0;
+  function shortHead(x){ return x && x[0]==='p' && x[1].length<=70 && !/[.;]\s*$/.test(x[1]) && !/^\(?[a-h]\)/.test(x[1]) && !/^(Required|Notes?)\b/i.test(x[1]); }
+  while(i<b.length){
+    if(b[i][0]==='t'){
+      /* run = blocs t, avec des titres courts de section intercales entre deux tableaux */
+      var j=i, parts=[], cnt=0;
+      while(j<b.length){
+        if(b[j][0]==='t'){ parts.push({t:'t',x:b[j][1]}); j++; cnt++; }
+        else if(shortHead(b[j]) && b[j+1] && b[j+1][0]==='t'){ parts.push({t:'p',x:b[j][1]}); j++; }
+        else break;
+      }
+      /* regroupement glouton : on agrandit le tableau tant que les colonnes restent coherentes (6 max) */
+      var k=0;
+      while(k<parts.length){
+        var best=null, bestEnd=k;
+        for(var e=k;e<parts.length;e++){
+          if(parts[e].t!=='t') continue;
+          var txt=parts.slice(k,e+1).map(function(q){ return q.t==='p' ? '\u0001'+q.x : q.x; }).join('\n'), th=null;
+          try{ th=exTableHtml(txt); }catch(err){ th=null; }
+          if(th && exTableMaxCols(th)<=6){ best=th; bestEnd=e; } else if(best) break;
+        }
+        if(best){ out+=best; k=bestEnd+1; }
+        else {
+          if(parts[k].t==='p') out+='<p>'+esc(parts[k].x)+'</p>';
+          else out+='<pre class="extab">'+esc(parts[k].x)+'</pre>';
+          k++;
+        }
+      }
+      i=j;
+    } else { out+='<p>'+esc(b[i][1])+'</p>'; i++; }
+  }
+  return out;
+}
+
 /* ---------- EXERCICES DU LIVRE ---------- */
 var CR_SUPP={8:[{t:'IFRS 5 supplement',d:'Held for sale and discontinued operations, from the textbook',u:'fiches/cr-ifrs5.pdf'}],10:[{t:'IAS 2 supplement',d:'Inventories, from the textbook',u:'fiches/cr-ias2.pdf'}]};
 function exData(){ return D.EXERCISES || null; }
@@ -368,11 +480,12 @@ function exExp(e){
 function exCardHtml(c,pos){
   var i=c.items[pos], qs=exQs(i), last=pos>=c.items.length-1, multi=qs.length>1;
   var sq=last?exSeqNext(c):null, nextHref=sq?'#/ex/'+sq.n:'#/ex/'+c.n+'/'+(pos+2);
-  var body=(i.b||[]).map(function(b){ return b[0]==='t' ? '<pre class="extab">'+esc(b[1])+'</pre>' : '<p>'+esc(b[1])+'</p>'; }).join('');
+  var body=exBodyHtml(i.b||[]);
   var h='<div class="excard"><div class="exmeta"><b>Exercise '+i.n+'</b><span class="exk '+(i.k==='calculation'?'calc':'')+'">'+i.k+'</span><span>PDF p. '+i.p+'</span>'+(multi?'<span>'+qs.length+' parts</span>':'')+'</div><div class="exstmt">'+body+'</div>';
   var allDone=qs.length>0;
   var nextBtn='<button type="button" class="cta pri" id="exnext" data-go="'+nextHref+'">'+(last&&!sq?'Finish':'Next exercise')+' &rarr;</button>';
   if(qs.length){
+    if(i.star) h+='<div class="exq nq">The book gives no answer for this exercise (reserved for lecturers). These questions and answers were worked out independently from the statement, so check them against your own working.</div>';
     qs.forEach(function(q,j){
       var key=exKey(i,j), has=exHas(key), a=exAns(key); if(!has) allDone=false;
       h+='<div class="exp'+(has?' answered':'')+'">'+(multi?'<div class="exp-h">Part ('+q.p+')</div>':'')+'<div class="exq-s">'+esc(q.s)+'</div>'+q.c.map(function(t,m){
