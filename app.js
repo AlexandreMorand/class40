@@ -477,7 +477,12 @@ function exSessProg(k){ var d=0,t=0,ok=0; exChaptersForSession(k).forEach(functi
 function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items[j])) return j; } return c.items.length; }
 function exExp(e){
   var L=String(e).split('\n'), h='<span class="exlead">'+esc(L[0])+'</span>';
-  if(L.length>1) h+='<div class="exw">'+L.slice(1).map(function(l){ var m=l.match(/^(Step \d+\.)\s*(.*)$/); return '<div class="exws">'+(m?'<b>'+esc(m[1])+'</b> '+esc(m[2]):esc(l))+'</div>'; }).join('')+'</div>';
+  if(L.length>1) h+='<div class="exw">'+L.slice(1).map(function(l){
+    var m=l.match(/^(Step \d+\.|Principle(?: \([^)]*\))?\.|Reading\.|Check[^:.]*[:.]|Evidence\.|Reasoning\.|Also useful:|Note:)\s*(.*)$/);
+    if(m) return '<div class="exws"><b>'+esc(m[1])+'</b> '+esc(m[2])+'</div>';
+    if(/^Wrong /.test(l)) return '<div class="exws exbad">'+esc(l)+'</div>';
+    return '<div class="exws">'+esc(l)+'</div>';
+  }).join('')+'</div>';
   return h;
 }
 function exCardHtml(c,pos){
