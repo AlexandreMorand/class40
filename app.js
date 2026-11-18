@@ -725,6 +725,28 @@ function chapterRows(cid, limit){
   if(limit) rows = rows.slice(0, limit);
   return rows.join('');
 }
+function homeSec(title, sub){ return '<div class="hsec"><h2>'+title+'</h2>'+(sub?'<span>'+sub+'</span>':'')+'</div>'; }
+function todayPlanCard(){
+  var plan=D.PLAN||{days:[]}, chk=store.planChecks||{}, d=new Date();
+  var key=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+  var CLn={cr:'CR',da:'DA',fm:'FM',cg:'CG'}, day=null, late=0;
+  plan.days.forEach(function(dy){
+    if(dy.d===key) day=dy;
+    else if(dy.d<key) dy.items.forEach(function(it,i){ if(it.k!=='off'&&it.k!=='exam'&&!chk[dy.d+'|'+i]) late++; });
+  });
+  var items=day?day.items.map(function(it,i){ return {it:it,i:i}; }).filter(function(x){ return x.it.k!=='off'&&x.it.k!=='exam'; }):[];
+  var left=items.filter(function(x){ return !chk[key+'|'+x.i]; }), mins=left.reduce(function(a,x){ return a+(x.it.min||0); },0);
+  var rows=items.slice(0,5).map(function(x){
+    var on=chk[key+'|'+x.i];
+    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+key+'|'+x.i+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+x.it.c+'">'+esc(CLn[x.it.c]||x.it.c)+'</b>'+esc(x.it.txt)+(x.it.min?' <span class="plmin">'+x.it.min+' min</span>':'')+(x.it.ref?' <a class="plgo" href="'+esc(x.it.ref)+'">ouvrir &rarr;</a>':'')+'</span></div>';
+  }).join('');
+  var more=items.length>5?'<div style="font-size:12px;color:var(--muted);margin-top:6px">+ '+(items.length-5)+' autre'+(items.length-5>1?'s':'')+' dans le plan</div>':'';
+  var head='Plan du jour'+(items.length?' &middot; '+left.length+' restante'+(left.length>1?'s':'')+(mins?' &middot; ~'+(mins>=90?(Math.round(mins/6)/10)+' h':mins+' min'):''):'');
+  return '<div class="card" style="margin-bottom:14px"><h2>'+head+'<button class="tag" data-go="#/plan">Plan complet</button></h2>'
+    + (late?'<div class="hwarn">'+late+' tache'+(late>1?'s':'')+' en retard &middot; <a href="#/plan">a rattraper</a></div>':'')
+    + (rows||'<div class="plitem ploff"><span>Rien de prevu au plan aujourd&#39;hui.</span></div>')+more+'</div>';
+}
+function homeTile(go, t, sub, ic){ return '<button class="hmt" data-go="'+go+'"><span class="ic">'+(ic||'')+'</span><span class="hmt-t"><b>'+t+'</b><span>'+sub+'</span></span><span class="hmt-go">&rarr;</span></button>'; }
 function vHome(){
   var g = globalProgress(), st = streakDays(), m = nextMission();
   var c = courseOf(state.course);
@@ -733,28 +755,47 @@ function vHome(){
     : 'Tout est au vert. Refais un QCM blanc ou revise les flashcards.';
   var circ = 2*Math.PI*48;
   var upcoming = allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null && n>=0; }).slice(0,5);
+  var exT = exData() ? exTotals() : null;
   return ''
   + '<div class="hero"><div class="ring"><svg width="112" height="112"><circle cx="56" cy="56" r="48" stroke="rgba(255,255,255,.25)" stroke-width="9" fill="none"/><circle id="heroRing" cx="56" cy="56" r="48" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'"/></svg><div class="val"><div><b>'+g.pct+'%</b><span>GLOBAL</span></div></div></div>'
   + '<div><div class="eyebrow">MISSION DU JOUR</div><h1>'+(m ? esc(courseOf(m.course).name)+' &middot; Session '+m.s.n : 'Tout est fait')+'</h1><p>'+esc(missionHTML)+'</p><br>'
   + (m ? '<button class="cta" data-go="#/q/'+m.course+'/'+m.s.key+'">Commencer le QCM &rarr;</button> <button class="cta ghost" data-go="#/f/'+(m?m.course:'cr')+'/'+(m?m.s.key:'')+'">Flashcards</button>' : '<button class="cta" data-go="#/q/cr">QCM blanc</button>')
   + '</div></div>'
+
+  + homeSec('Aujourd&#39;hui','ce qu&#39;il faut faire maintenant')
+  + todayPlanCard()
+  + mistakesBlock()
+  + srsCard()
+
+  + homeSec('Ma progression','par matiere')
   + '<div class="stats">'
   + '<button class="stat" data-go="#/q/'+state.course+'"><b>'+g.done+'</b><span>questions traitees</span><small>+'+todayDone()+' aujourd\'hui</small></button>'
   + '<button class="stat" data-go="#/f/'+state.course+'"><b>'+st+' jour'+(st>1?'s':'')+'</b><span>serie en cours</span><small>objectif : 10 questions</small></button>'
   + '<button class="stat" data-go="#/q/'+state.course+'"><b>'+accuracy()+'%</b><span>reussite moyenne</span><small>au premier essai</small></button>'
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
-  + srsCard()
-  + mistakesBlock()
-  + (exData() ? '<div class="card" style="margin-bottom:18px"><h2>Textbook exercises</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Every end of chapter exercise of Corporate Reporting, as in the book, answered as a multiple choice question.</p><button class="cta pri" data-go="#/ex">Open by chapter &rarr;</button></div>' : '')
-  + '<div class="card" style="margin-bottom:18px"><h2>Préparer l&#39;examen global de CR</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/cr-gen-mock1"><span class="pt-item-t"><b>Mock officiel CR #1</b><span>18 QCM · 35 min · corrigé détaillé</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt"><span class="pt-item-t"><b>Tous les mocks et partiels blancs</b><span>5 mocks officiels, review session du prof, blancs Partie A et B</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
-  + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
   + courseChips(state.course)
-  + '<div class="grid"><section class="card"><h2>'+esc(c.name)+' &middot; progression par session <button class="tag" data-go="#/c/'+c.id+'">Tout voir</button></h2>'
+  + '<div class="grid"><section class="card"><h2>'+esc(c.name)+' &middot; sessions <button class="tag" data-go="#/c/'+c.id+'">Tout voir</button></h2>'
   + chapterRows(c.id, 5)
   + '</section><aside class="card"><h2>Echeances a venir <button class="tag" data-go="#/dl">Tout</button></h2>'
   + (upcoming.length ? upcoming.map(dlRow).join('') : '<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>')
-  + '</aside></div>';
+  + '</aside></div>'
+
+  + homeSec('S&#39;entrainer','choisis ton mode de travail')
+  + '<div class="hmgrid">'
+  + homeTile('#/qb','QCM a la carte','matiere, difficulte, sessions au choix',IC.card)
+  + (exT ? homeTile('#/ex','Exercices du livre','CR &middot; '+exT.done+' sur '+exT.total+' faits, un par un',IC.sheet) : '')
+  + homeTile('#/pt','Mocks et partiels blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
+  + homeTile('#/f/'+state.course,'Flashcards','revision espacee de '+esc(c.name),IC.card)
+  + homeTile('#/cs/'+state.course,'Synthese du cours','formules et definitions de '+esc(c.name),IC.sheet)
+  + '</div>'
+
+  + homeSec('Suivi','notes, plan et dates')
+  + '<div class="hmgrid">'
+  + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
+  + homeTile('#/plan','Plan de revision','jusqu&#39;aux examens de decembre',IC.plan)
+  + homeTile('#/dl','Echeances','examens, rendus et dates perso',IC.cal)
+  + '</div>';
 }
 function dlRow(d){
   var n = dlDays(d.date), w = dlWhen(d.date);
