@@ -205,11 +205,14 @@ var IC = {
 
 /* ---------- ROUTER ---------- */
 var state = {course:'cr'};
+try{ var _f=JSON.parse(localStorage.getItem('c40.v2')||'{}').focus; if(_f) state.course=_f; }catch(e){}
 function parseHash(){
   var h = location.hash.replace(/^#\/?/, '');
   var p = h.split('/').filter(Boolean);
   if(!p.length) return {page:'home'};
   if(p[0]==='plan') return {page:'plan'};
+  if(p[0]==='rev') return {page:'rev'};
+  if(p[0]==='exam') return {page:'exam'};
   if(p[0]==='rc'&&p[1]) return {page:'recall', course:p[1]};
   if(p[0]==='c'&&p[1]) return {page:'course', course:p[1]};
   if(p[0]==='s'&&p[1]&&p[2]!=null) return {page:'session', course:p[1], n:p[2]};
@@ -541,13 +544,35 @@ function vEx(ch,k){
 }
 /* ---- accueil des exercices : par session du cours, jamais par chapitre du livre en premier ---- */
 function crSessionList(){ return sessionsOf('cr').filter(function(x){ return x.n; }); }
-function exSeenSession(){
-  var v=(store.seen||{}).cr; if(v) return {n:v, auto:false};
+function seenSession(cid){
+  var v=(store.seen||{})[cid]; if(v) return {n:v, auto:false};
+  if(cid==='cr') return {n:10, auto:true};
   var best=0;
-  Object.keys(store.fiches||{}).forEach(function(k){ var m=k.match(/^cr-(\d+)$/); if(m) best=Math.max(best,parseInt(m[1],10)); });
-  store.attempts.forEach(function(a){ if(a.course==='cr'){ var n=parseInt(a.session,10); if(n) best=Math.max(best,n); } });
-  if(!best){ var now=Date.now(); crSessionList().forEach(function(x){ if(x.date && new Date(x.date).getTime()<=now) best=Math.max(best,x.n); }); }
+  Object.keys(store.fiches||{}).forEach(function(k){ var m=k.match(new RegExp('^'+cid+'-(\\d+)$')); if(m) best=Math.max(best,parseInt(m[1],10)); });
+  store.attempts.forEach(function(a){ if(a.course===cid){ var n=parseInt(a.session,10); if(n) best=Math.max(best,n); } });
+  if(!best){ var now=Date.now(); sessionsOf(cid).forEach(function(x){ if(x.date && new Date(x.date).getTime()<=now) best=Math.max(best,x.n); }); }
   return {n:best||1, auto:true};
+}
+function exSeenSession(){ return seenSession('cr'); }
+function sessionByN(cid,n){ var L=sessionsOf(cid); for(var i=0;i<L.length;i++){ if(L[i].n===n) return L[i]; } return L[0]||null; }
+function mySessionCard(cid){
+  var c=courseOf(cid), seen=seenSession(cid), cur=sessionByN(cid,seen.n);
+  if(!cur) return '';
+  var key=cur.key, seenF=!!store.fiches[cid+'-'+key], fu=ficheUrl(cid,key), nbC=cards(cid,key).length, kn=fcKnown(cid,key);
+  var sp=sessionProgress(cid,key), exs=(cid==='cr')?exChaptersForSession(key):[], exD=0, exT=0, exW=0;
+  exs.forEach(function(ch){ var q=exProgress(ch); exD+=q.done; exT+=q.total; ch.items.forEach(function(i){ if(exQs(i).some(function(qq,j){ var k=exKey(i,j); return exHas(k)&&exAns(k)!==qq.k; })) exW++; }); });
+  var mp=mistakePool(cid).length;
+  var seenOpts=''; var done={}; sessionsOf(cid).forEach(function(x){ if(done[x.n]) return; done[x.n]=1; seenOpts+='<option value="'+x.n+'"'+(x.n===seen.n?' selected':'')+'>Session '+x.n+' &middot; '+esc(x.title.length>54?x.title.slice(0,52)+'...':x.title)+'</option>'; });
+  function step(i,ok,t,sub,go,extra){ return '<button class="mst'+(ok?' ok':'')+'" '+go+'><span class="mst-n">'+(ok?'&#10003;':i)+'</span><span class="mst-t"><b>'+t+'</b><span>'+sub+'</span></span><span class="mst-g">'+(extra||'Ouvrir')+' &rarr;</span></button>'; }
+  var steps='';
+  steps+= fu ? '<a class="mst'+(seenF?' ok':'')+'" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+key+'"><span class="mst-n">'+(seenF?'&#10003;':1)+'</span><span class="mst-t"><b>Lire la fiche</b><span>'+(seenF?'deja lue':'resume de la session, PDF')+'</span></span><span class="mst-g">Ouvrir &rarr;</span></a>' : '';
+  steps+= nbC ? step(2,nbC&&kn>=nbC,'Flashcards',nbC+' cartes &middot; '+kn+' connues','data-go="#/f/'+cid+'/'+key+'"','Reviser') : '';
+  steps+= sp.total ? step(3,sp.pct>=100,'QCM de la session',sp.done+'/'+sp.total+' questions &middot; '+sp.acc+'% de reussite','data-go="#/s/'+cid+'/'+key+'"',sp.done?'Reprendre':'Commencer') : '';
+  steps+= exT ? step(4,exD>=exT,'Exercices du livre',exD+'/'+exT+' faits'+(exW?' &middot; <span class="exwr">'+exW+' rate'+(exW>1?'s':'')+'</span>':''),'data-act="exsess" data-s="'+key+'"',exD?'Continuer':'Commencer') : '';
+  steps+= step(5,!mp,'Mes fautes',mp?mp+' question'+(mp>1?'s':'')+' a revoir (recall de memoire)':'aucune faute en attente',mp?'data-act="rcstart" data-cid="'+cid+'"':'data-go="#/rev"',mp?'Active recall':'Reviser');
+  return '<div class="card mysess"><div class="mys-h"><div><div class="mys-e">MA SESSION &middot; '+esc(c.name)+'</div><div class="mys-t">Session '+cur.n+'</div><div class="mys-s">'+esc(cur.title)+'</div></div>'
+    + '<div class="mys-sel"><label>Je suis en</label><select class="exsel" id="mySess" data-cid="'+cid+'">'+seenOpts+'</select></div></div>'
+    + '<div class="msts">'+steps+'</div></div>';
 }
 function exGroups(){
   var groups=[];
@@ -604,7 +629,7 @@ function exIndexHtml(E,tt,sc){
   return h+'</div></details>';
 }
 
-document.addEventListener('change',function(e){ var t=e.target; if(t&&t.id==='exSeen'){ store.seen=store.seen||{}; store.seen.cr=parseInt(t.value,10); save(); render(); } });
+document.addEventListener('change',function(e){ var t=e.target; if(t&&t.id==='mySess'){ store.seen=store.seen||{}; store.seen[t.getAttribute('data-cid')]=parseInt(t.value,10); save(); render(); return; } if(t&&t.id==='exSeen'){ store.seen=store.seen||{}; store.seen.cr=parseInt(t.value,10); save(); render(); } });
 document.addEventListener('keydown',function(e){
   if(!/^#\/ex\/\d+/.test(location.hash)||e.metaKey||e.ctrlKey||e.altKey) return;
   var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA') return;
@@ -715,21 +740,18 @@ function moyBind(){
 /* ---------- RENDER SHELL ---------- */
 var root = $('#c40root');
 var navDef = [
-  {page:'home', hash:'#/', label:'Accueil', icon:IC.home},
+  {page:'home', hash:'#/', label:'Aujourd\'hui', icon:IC.home},
+  {page:'course', hash:'#/c/cr', label:'Cours', icon:IC.grid},
+  {page:'rev', hash:'#/rev', label:'Reviser', icon:IC.card},
   {page:'plan', hash:'#/plan', label:'Plan', icon:IC.plan},
-  {page:'course', hash:'#/c/cr', label:'Parcours', icon:IC.grid},
-  {page:'quiz', hash:'#/qb', label:'QCM', icon:IC.qcm},
-  {page:'flash', hash:'#/f/cr', label:'Flashcards', icon:IC.card},
-  {page:'partiels', hash:'#/pt', label:'Partiels', icon:IC.clock},
-  {page:'deadlines', hash:'#/dl', label:'Echeances', icon:IC.cal}
+  {page:'exam', hash:'#/exam', label:'Examens', icon:IC.clock}
 ];
+var NAVGROUP = {home:'home', course:'course', session:'course', cheat:'course', ex:'course', rev:'rev', quiz:'rev', qbuilder:'rev', qplay:'rev', flash:'rev', recall:'rev', plan:'plan', exam:'exam', partiels:'exam', ptitem:'exam', deadlines:'exam', moyennes:'exam'};
 function navHTML(r){
   return navDef.map(function(n){
-    var on = (n.page==='course' && (r.page==='course'||r.page==='session'||r.page==='cheat'||r.page==='ex')) || (n.page==='quiz' && (r.page==='quiz'||r.page==='qbuilder'||r.page==='qplay')) || (n.page==='flash' && r.page==='flash') || (n.page===r.page && n.page!=='course' && n.page!=='quiz' && n.page!=='flash');
-    if(n.page==='partiels' && (r.page==='partiels'||r.page==='ptitem')) on = true;
-    if(n.page==='home' && r.page==='home') on = true;
-    if(n.page==='deadlines' && r.page==='deadlines') on = true;
-    return '<button class="nav'+(on?' on':'')+'" data-go="'+n.hash+'">'+n.icon+'<span>'+n.label+'</span></button>';
+    var on = NAVGROUP[r.page]===n.page;
+    var h = n.page==='course' ? '#/c/'+state.course : n.hash;
+    return '<button class="nav'+(on?' on':'')+'" data-go="'+h+'">'+n.icon+'<span>'+n.label+'</span></button>';
   }).join('');
 }
 function shell(content, r){
@@ -758,14 +780,14 @@ function courseChips(active){
     return '<button class="pill'+(c.id===active?' on':'')+'" data-go="#/c/'+c.id+'"><span class="code">'+c.code+'</span>'+esc(c.name)+' <small>'+p.pct+'%</small></button>';
   }).join('')+'</div>';
 }
-function chapterRows(cid, limit){
-  var ss = sessionsOf(cid).filter(function(s){ return bank(cid,s.key).length>0 || cards(cid,s.key).length>0 || !!ficheUrl(cid,s.key); });
+function chapterRows(cid, limit, pred, dim){
+  var ss = sessionsOf(cid).filter(function(s){ return (bank(cid,s.key).length>0 || cards(cid,s.key).length>0 || !!ficheUrl(cid,s.key)) && (!pred || pred(s)); });
   var rows = ss.map(function(s){
     var p = sessionProgress(cid, s.key);
     var cls = p.pct===100 ? 'done' : (p.done>0 ? 'cur' : '');
     var meta = p.total ? (p.done+'/'+p.total+' questions &middot; '+p.acc+'% reussite') : 'QCM a venir';
     var label = s.part ? 'S'+s.n+' &middot; Partie '+s.part : 'Session '+s.n;
-    return '<div class="ch '+cls+'" data-go="#/s/'+cid+'/'+s.key+'">'
+    return '<div class="ch '+cls+(dim?' exdim':'')+'" data-go="#/s/'+cid+'/'+s.key+'">'
       + '<span class="num">'+s.n+'</span>'
       + '<div class="tx"><b>'+esc(s.title)+'</b><span>'+label+' &middot; '+meta+'</span><div class="bar"><i class="'+(p.pct===100?'full':'')+'" data-w="'+p.pct+'"></i></div></div>'
       + '<span class="pct">'+p.pct+'%</span>'
@@ -774,6 +796,35 @@ function chapterRows(cid, limit){
   });
   if(limit) rows = rows.slice(0, limit);
   return rows.join('');
+}
+function coursePills(){
+  return '<div class="courses">'+COURSES.map(function(c){ return '<button class="pill'+(c.id===state.course?' on':'')+'" data-act="setcourse" data-cid="'+c.id+'"><span class="code">'+c.code+'</span>'+esc(c.name)+'</button>'; }).join('')+'</div>';
+}
+function vRevise(){
+  var cid=state.course, c=courseOf(cid);
+  return '<div class="page-h">Reviser</div><div class="page-sub">Tout ce qui sert a retenir et a corriger, au meme endroit.</div>'
+    + coursePills()
+    + homeSec('1. Corriger mes fautes','ce que tu as rate, de toutes les matieres')
+    + mistakesBlock()
+    + homeSec('2. Revision du jour','selon l&#39;espacement, pour '+esc(c.name))
+    + srsCard()
+    + homeSec('3. S&#39;entrainer librement','pour '+esc(c.name))
+    + '<div class="hmgrid">'
+    + homeTile('#/qb','QCM a la carte','matiere, difficulte, sessions au choix',IC.qcm)
+    + homeTile('#/q/'+cid,'QCM blanc','toutes les sessions, ordre aleatoire',IC.qcm)
+    + homeTile('#/f/'+cid,'Flashcards','toutes les cartes de '+esc(c.name),IC.card)
+    + (D.CHEATSHEET[cid] ? homeTile('#/cs/'+cid,'Synthese du cours','formules et definitions',IC.sheet) : '')
+    + '</div>';
+}
+function vExams(){
+  var up=allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null && n>=0; }).slice(0,6);
+  return '<div class="page-h">Examens</div><div class="page-sub">Dates, partiels blancs et notes.</div>'
+    + '<div class="card" style="margin-bottom:18px"><h2>Prochaines dates <button class="tag" data-go="#/dl">Tout voir</button></h2>'+(up.length?up.map(dlRow).join(''):'<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>')+'</div>'
+    + '<div class="hmgrid">'
+    + homeTile('#/pt','Partiels et mocks blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
+    + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
+    + homeTile('#/dl','Echeances','examens, rendus et dates perso',IC.cal)
+    + '</div>';
 }
 function homeSec(title, sub){ return '<div class="hsec"><h2>'+title+'</h2>'+(sub?'<span>'+sub+'</span>':'')+'</div>'; }
 function todayPlanCard(){
@@ -807,10 +858,14 @@ function vHome(){
   var upcoming = allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null && n>=0; }).slice(0,5);
   var exT = exData() ? exTotals() : null;
   return ''
-  + '<div class="hero"><div class="ring"><svg width="112" height="112"><circle cx="56" cy="56" r="48" stroke="rgba(255,255,255,.25)" stroke-width="9" fill="none"/><circle id="heroRing" cx="56" cy="56" r="48" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'"/></svg><div class="val"><div><b>'+g.pct+'%</b><span>GLOBAL</span></div></div></div>'
-  + '<div><div class="eyebrow">MISSION DU JOUR</div><h1>'+(m ? esc(courseOf(m.course).name)+' &middot; Session '+m.s.n : 'Tout est fait')+'</h1><p>'+esc(missionHTML)+'</p><br>'
-  + (m ? '<button class="cta" data-go="#/q/'+m.course+'/'+m.s.key+'">Commencer le QCM &rarr;</button> <button class="cta ghost" data-go="#/f/'+(m?m.course:'cr')+'/'+(m?m.s.key:'')+'">Flashcards</button>' : '<button class="cta" data-go="#/q/cr">QCM blanc</button>')
-  + '</div></div>'
+  + (function(){
+      var cid=state.course, seen=seenSession(cid), cur=sessionByN(cid,seen.n), sp=cur?sessionProgress(cid,cur.key):{pct:0}, mp=mistakePool(cid).length;
+      return '<div class="hero"><div class="ring"><svg width="112" height="112"><circle cx="56" cy="56" r="48" stroke="rgba(255,255,255,.25)" stroke-width="9" fill="none"/><circle id="heroRing" cx="56" cy="56" r="48" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'"/></svg><div class="val"><div><b>'+g.pct+'%</b><span>GLOBAL</span></div></div></div>'
+      + '<div><div class="eyebrow">MA SESSION</div><h1>'+esc(courseOf(cid).name)+' &middot; Session '+seen.n+'</h1><p>'+(cur?esc(cur.title)+'. QCM de la session a '+sp.pct+'%.':'')+(mp?' '+mp+' faute'+(mp>1?'s':'')+' a revoir.':'')+'</p><br>'
+      + (cur?'<button class="cta" data-go="#/c/'+cid+'">Ouvrir ma session &rarr;</button> ':'')
+      + (mp?'<button class="cta ghost" data-act="rcstart" data-cid="'+cid+'">Revoir mes fautes</button>':'<button class="cta ghost" data-go="#/rev">Reviser</button>')
+      + '</div></div>';
+    })()
 
   + homeSec('Aujourd&#39;hui','ce qu&#39;il faut faire maintenant')
   + todayPlanCard()
@@ -825,42 +880,30 @@ function vHome(){
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
   + courseChips(state.course)
-  + '<div class="grid"><section class="card"><h2>'+esc(c.name)+' &middot; sessions <button class="tag" data-go="#/c/'+c.id+'">Tout voir</button></h2>'
-  + chapterRows(c.id, 5)
-  + '</section><aside class="card"><h2>Echeances a venir <button class="tag" data-go="#/dl">Tout</button></h2>'
-  + (upcoming.length ? upcoming.map(dlRow).join('') : '<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>')
-  + '</aside></div>'
-
-  + homeSec('S&#39;entrainer','choisis ton mode de travail')
-  + '<div class="hmgrid">'
-  + homeTile('#/qb','QCM a la carte','matiere, difficulte, sessions au choix',IC.card)
-  + (exT ? homeTile('#/ex','Exercices par session','CR &middot; dans l&#39;ordre du cours, '+exT.done+' sur '+exT.total+' faits',IC.sheet) : '')
-  + homeTile('#/pt','Mocks et partiels blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
-  + homeTile('#/f/'+state.course,'Flashcards','revision espacee de '+esc(c.name),IC.card)
-  + homeTile('#/cs/'+state.course,'Synthese du cours','formules et definitions de '+esc(c.name),IC.sheet)
-  + '</div>'
-
-  + homeSec('Suivi','notes, plan et dates')
-  + '<div class="hmgrid">'
-  + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
-  + homeTile('#/plan','Plan de revision','jusqu&#39;aux examens de decembre',IC.plan)
-  + homeTile('#/dl','Echeances','examens, rendus et dates perso',IC.cal)
-  + '</div>';
+  + '';
 }
 function dlRow(d){
   var n = dlDays(d.date), w = dlWhen(d.date);
   var soon = n!=null && n<=7 ? ' soon' : '';
-  var chip = n==null ? '' : (n===0 ? "aujourd'hui" : 'J-'+n);
+  var chip = n==null ? '' : (n===0 ? "aujourd'hui" : (n<0 ? 'passee' : 'J-'+n));
   return '<a class="dl'+soon+'" data-go="#/c/'+(d.course||'cr')+'"><span class="when"><b>'+w.b+'</b><span>'+w.s+'</span></span><span class="tx"><b>'+esc(d.label)+'</b><span>'+esc(courseOf(d.course||'cr').name)+(d.kind?' &middot; '+esc(d.kind):'')+'</span></span><span class="chip2">'+chip+'</span></a>';
 }
 function vCourse(cid){
-  var c = courseOf(cid), p = courseProgress(cid);
-  var rows = chapterRows(cid);
+  var c = courseOf(cid), p = courseProgress(cid), seen=seenSession(cid), n=seen.n;
+  var cur=function(s){ return s.n<=n; }, nxt=function(s){ return s.n>n; };
+  var follow=chapterRows(cid, 0, cur, false), later=chapterRows(cid, 0, nxt, true);
   return courseChips(cid)
   + '<div class="page-h">'+esc(c.name)+'</div><div class="page-sub">'+esc(c.sub)+' &middot; '+p.done+'/'+p.total+' questions traitees ('+p.pct+'%)</div>'
+  + mySessionCard(cid)
   + (cid==='fm' ? '<div class="card" style="margin-bottom:18px"><h2>Mock exam FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM à 3 options + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Blackboard · accès Bocconi requis</span></span><span class="pt-new">Ouvrir</span></button></div></div>' : '')
-  + '<div class="grid"><section class="card"><h2>Sessions</h2>'+rows+'</section>'
-  + '<aside><div class="card" style="margin-bottom:14px"><h2>Outils transverses</h2>'
+  + '<div class="grid"><section>'
+  + '<div class="card" style="margin-bottom:14px"><h2>Sessions suivies, a consolider</h2>'+(follow||'<p style="font-size:12.5px;color:var(--muted)">Aucune session avec du contenu pour le moment.</p>')+'</div>'
+  + (later?'<details class="exdet"><summary>A venir, attends le cours</summary><div class="card">'+later+'</div></details>':'')
+  + '</section><aside>'
+  + '<div class="card" style="margin-bottom:14px"><h2>Echeances '+c.code+'</h2>'
+  + (allDeadlines().filter(function(d){ return d.course===cid; }).map(dlRow).join('') || '<p style="font-size:12.5px;color:var(--muted)">Aucune.</p>')
+  + '</div>'
+  + '<details class="exdet" style="margin-top:0"><summary>Ressources du cours</summary><div class="card" style="margin-top:8px">'
   + '<div class="ch" data-go="#/q/'+cid+'"><span class="num">'+IC.qcm+'</span><div class="tx"><b>QCM blanc</b><span>toutes les sessions, ordre aleatoire</span></div><span class="go">Lancer</span></div>'
   + (cid==='da' ? '<div class="ch" data-go="#/q/da/all/dataset"><span class="num">'+IC.data+'</span><div class="tx"><b>QCM datasets R</b><span>'+(D.QCM_DATA.da||[]).length+' questions sur SUP / TOP / WINE / PSA...</span></div><span class="go">Lancer</span></div>' : '')
   + '<div class="ch" data-go="#/f/'+cid+'"><span class="num">'+IC.card+'</span><div class="tx"><b>Flashcards du cours</b><span>'+(D.FLASHCARDS[cid]||[]).length+' cartes, toutes sessions</span></div><span class="go">Reviser</span></div>'
@@ -868,10 +911,8 @@ function vCourse(cid){
   + (cid==='cr' && exData() ? '<div class="ch" data-go="#/ex"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Textbook exercises by chapter</b><span>'+exTotals().total+' exercises as multiple choice questions</span></div><span class="go">Open</span></div>' : '')
   + (cid==='cr' ? [8,10].map(function(n){ return CR_SUPP[n].map(function(f){ return '<div class="ch"><span class="num">'+IC.pdf+'</span><div class="tx"><b>'+f.t+'</b><span>'+f.d+'</span></div><a class="go" href="'+f.u+'?v=20261116" target="_blank" rel="noopener">Open</a></div>'; }).join(''); }).join('') : '')
   + (D.CHEATSHEET[cid] ? '<div class="ch" data-go="#/cs/'+cid+'"><span class="num">'+IC.sheet+'</span><div class="tx"><b>Fiche de synthese</b><span>tout le cours en une page</span></div><span class="go">Lire</span></div>' : '')
-  + '</div>'
-  + '<div class="card"><h2>Echeances '+c.code+'</h2>'
-  + (allDeadlines().filter(function(d){ return d.course===cid; }).map(dlRow).join('') || '<p style="font-size:12.5px;color:var(--muted)">Aucune.</p>')
-  + '</div></aside></div>';
+  + '</div></details>'
+  + '</aside></div>';
 }
 function supplementTiles(cid,n){
   var groups={}; bank(cid,n).filter(function(q){return q.supplement;}).forEach(function(q){groups[q.set]=q;});
@@ -1471,6 +1512,7 @@ function closeSearch(){ var ov = $('#c40search'); if(ov) ov.remove(); }
 /* ---------- RENDER ---------- */
 function render(){
   var r = parseHash(), content;
+  if(r.course && COURSES.some(function(c){ return c.id===r.course; }) && state.course!==r.course){ state.course=r.course; store.focus=r.course; save(); }
   switch(r.page){
     case 'home': content = vHome(); break;
     case 'course': content = vCourse(r.course); break;
@@ -1482,6 +1524,8 @@ function render(){
     case 'cheat': content = vCheat(r.course); break;
     case 'deadlines': content = vDeadlines(); break;
     case 'plan': content = vPlan(); break;
+    case 'rev': content = vRevise(); break;
+    case 'exam': content = vExams(); break;
     case 'recall': content = vRecall(r.course); break;
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
@@ -1514,6 +1558,7 @@ document.addEventListener('click', function(e){
     if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
+    if(act==='setcourse'){ state.course=a.getAttribute('data-cid'); store.focus=state.course; save(); render(); return; }
     if(act==='rcstart'){ startRecall(a.getAttribute('data-cid')); return; }
     if(act==='rcreveal'){ rcs.rev=true; render(); return; }
     if(act==='rcknow'){ rcAnswer(true); return; }
