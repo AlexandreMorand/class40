@@ -743,10 +743,9 @@ var navDef = [
   {page:'home', hash:'#/', label:'Aujourd\'hui', icon:IC.home},
   {page:'course', hash:'#/c/cr', label:'Cours', icon:IC.grid},
   {page:'rev', hash:'#/rev', label:'Reviser', icon:IC.card},
-  {page:'plan', hash:'#/plan', label:'Plan', icon:IC.plan},
   {page:'exam', hash:'#/exam', label:'Examens', icon:IC.clock}
 ];
-var NAVGROUP = {home:'home', course:'course', session:'course', cheat:'course', ex:'course', rev:'rev', quiz:'rev', qbuilder:'rev', qplay:'rev', flash:'rev', recall:'rev', plan:'plan', exam:'exam', partiels:'exam', ptitem:'exam', deadlines:'exam', moyennes:'exam'};
+var NAVGROUP = {home:'home', course:'course', session:'course', cheat:'course', ex:'course', rev:'rev', quiz:'rev', qbuilder:'rev', qplay:'rev', flash:'rev', recall:'rev', plan:'home', exam:'exam', partiels:'exam', ptitem:'exam', deadlines:'exam', moyennes:'exam'};
 function navHTML(r){
   return navDef.map(function(n){
     var on = NAVGROUP[r.page]===n.page;
@@ -823,29 +822,21 @@ function vExams(){
     + '<div class="hmgrid">'
     + homeTile('#/pt','Partiels et mocks blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
     + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
-    + homeTile('#/dl','Echeances','examens, rendus et dates perso',IC.cal)
     + '</div>';
 }
 function homeSec(title, sub){ return '<div class="hsec"><h2>'+title+'</h2>'+(sub?'<span>'+sub+'</span>':'')+'</div>'; }
 function todayPlanCard(){
-  var plan=D.PLAN||{days:[]}, chk=store.planChecks||{}, d=new Date();
-  var key=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
-  var CLn={cr:'CR',da:'DA',fm:'FM',cg:'CG'}, day=null, late=0;
-  plan.days.forEach(function(dy){
-    if(dy.d===key) day=dy;
-    else if(dy.d<key) dy.items.forEach(function(it,i){ if(it.k!=='off'&&it.k!=='exam'&&!chk[dy.d+'|'+i]) late++; });
-  });
-  var items=day?day.items.map(function(it,i){ return {it:it,i:i}; }).filter(function(x){ return x.it.k!=='off'&&x.it.k!=='exam'; }):[];
-  var left=items.filter(function(x){ return !chk[key+'|'+x.i]; }), mins=left.reduce(function(a,x){ return a+(x.it.min||0); },0);
-  var rows=items.slice(0,5).map(function(x){
-    var on=chk[key+'|'+x.i];
-    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+key+'|'+x.i+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+x.it.c+'">'+esc(CLn[x.it.c]||x.it.c)+'</b>'+esc(x.it.txt)+(x.it.min?' <span class="plmin">'+x.it.min+' min</span>':'')+(x.it.ref?' <a class="plgo" href="'+esc(x.it.ref)+'">ouvrir &rarr;</a>':'')+'</span></div>';
+  var m=planModel(), key=pdKey(new Date()), CLn={cr:'CR',da:'DA',adm:'Admin'};
+  var day=m.days.filter(function(d){ return d.d===key; })[0];
+  var items=day?day.items.filter(function(x){ return x.k!=='exam'; }):[];
+  var left=items.filter(function(x){ return !x.isDone; }), mins=left.reduce(function(a,x){ return a+(x.min||0); },0);
+  var rows=items.slice(0,6).map(function(it){
+    return '<div class="plitem'+(it.isDone?' pldone':'')+'"><button class="plck'+(it.isDone?' on':'')+'" data-act="plchk" data-k="'+esc(it.id)+'">'+(it.isDone?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CLn[it.c]||it.c)+'</b>'+esc(it.txt)+' <span class="plmin">'+it.min+' min</span>'+(it.ref?' <a class="plgo" href="'+esc(it.ref)+'">ouvrir &rarr;</a>':'')+'</span></div>';
   }).join('');
-  var more=items.length>5?'<div style="font-size:12px;color:var(--muted);margin-top:6px">+ '+(items.length-5)+' autre'+(items.length-5>1?'s':'')+' dans le plan</div>':'';
+  var more=items.length>6?'<div style="font-size:12px;color:var(--muted);margin-top:6px">+ '+(items.length-6)+' autre'+(items.length-6>1?'s':'')+' dans le plan</div>':'';
   var head='Plan du jour'+(items.length?' &middot; '+left.length+' restante'+(left.length>1?'s':'')+(mins?' &middot; ~'+(mins>=90?(Math.round(mins/6)/10)+' h':mins+' min'):''):'');
   return '<div class="card" style="margin-bottom:14px"><h2>'+head+'<button class="tag" data-go="#/plan">Plan complet</button></h2>'
-    + (late?'<div class="hwarn">'+late+' tache'+(late>1?'s':'')+' en retard &middot; <a href="#/plan">a rattraper</a></div>':'')
-    + (rows||'<div class="plitem ploff"><span>Rien de prevu au plan aujourd&#39;hui.</span></div>')+more+'</div>';
+    + (rows||'<div class="plitem ploff"><span>Rien de prevu aujourd&#39;hui.</span></div>')+more+'</div>';
 }
 function homeTile(go, t, sub, ic){ return '<button class="hmt" data-go="'+go+'"><span class="ic">'+(ic||'')+'</span><span class="hmt-t"><b>'+t+'</b><span>'+sub+'</span></span><span class="hmt-go">&rarr;</span></button>'; }
 function vHome(){
@@ -1407,61 +1398,121 @@ function mistakesBlock(){
     + '<div class="pt-items">'+rows+'</div></div>';
 }
 
-/* ---------- PLAN DE REVISION ---------- */
+/* ---------- PLAN DE REVISION (calcule a chaque affichage, jamais en retard) ---------- */
+function pdKey(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function pdAdd(ds,n){ var p=ds.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]+n); return pdKey(d); }
+function planDoneMap(){ return store.planDone || (store.planDone={}); }
+function planGen(cid, seenN){
+  var NEW=[], CONS=[], chSeen={}, L=(cid==='cr'?crSessionList():sessionsOf(cid).filter(function(x){ return typeof x.n==='number' && x.n<=12; }));
+  L.forEach(function(x){
+    var key=x.key, isNew=x.n>seenN, bk=bank(cid,key).concat(levelBank(cid,key)), rev=/^Review/i.test(x.title);
+    var T=isNew?NEW:CONS;
+    if(isNew){
+      if(rev) T.push({id:cid+'-rev-'+x.n, c:cid, k:'revue', min:30, txt:'Session '+x.n+' ('+x.title+') : fiche et flashcards', ref:'#/s/'+cid+'/'+x.n, auto:function(){ return !!store.fiches[cid+'-'+key]; }});
+      else{
+        T.push({id:cid+'-learn-'+x.n, c:cid, k:'revue', min:45, txt:'Session '+x.n+' ('+x.title+') : fiche + flashcards', ref:'#/s/'+cid+'/'+x.n,
+          auto:(function(key){ return function(){ var nb=cards(cid,key).length; return !!store.fiches[cid+'-'+key] && (!nb || fcKnown(cid,key)>=nb*0.5); }; })(key)});
+      }
+    }
+    if(bk.length && !rev) T.push({id:cid+'-qcm-'+x.n, c:cid, k:'qcm', min:20, txt:(isNew?'QCM session ':'Consolider : QCM session ')+x.n+', objectif >= 70 %', ref:'#/q/'+cid+'/'+key,
+      auto:(function(key){ return function(){ var q=sessionProgress(cid,key); return q.done>=Math.min(q.total,15) && q.acc>=70; }; })(key)});
+    if(cid==='cr'){
+      exChaptersForSession(x.n).forEach(function(ch){
+        if(chSeen[ch.n]) return; chSeen[ch.n]=1;
+        T.push({id:'cr-ex-'+ch.n, c:'cr', k:'revue', min:40, txt:'Exercices du livre, chapitre '+ch.n+' ('+ch.t+')', ref:'#/ex/'+ch.n, auto:function(){ var q=exProgress(ch); return q.done>=Math.ceil(q.total*0.8); }});
+      });
+    }
+  });
+  /* 2 nouvelles pour 1 de consolidation */
+  var out=[], i=0, j=0; while(i<NEW.length||j<CONS.length){ for(var t=0;t<2&&i<NEW.length;t++) out.push(NEW[i++]); if(j<CONS.length) out.push(CONS[j++]); }
+  return out;
+}
+function planModel(){
+  var P=D.PLAN||{exams:[]}, done=planDoneMap(), today=pdKey(new Date());
+  var exD={}; P.exams.forEach(function(e){ exD[e.c]=String(e.date).slice(0,10); });
+  var last={cr:pdAdd(exD.cr||'2026-12-11',-1), da:pdAdd(exD.da||'2026-12-16',-1)};
+  var seenCR=seenSession('cr').n, seenDA=seenSession('da').n;
+  var fixed={}; function fx(d,it){ (fixed[d]=fixed[d]||[]).push(it); }
+  var cr=(exD.cr||'2026-12-11'), da=(exD.da||'2026-12-16');
+  fx(pdAdd(cr,-5),{id:'cr-blanc1',c:'cr',k:'qcm',min:45,txt:'BLANC Partie A : QCM 45 min en conditions reelles, sans support',ref:'#/pt'});
+  fx(pdAdd(cr,-5),{id:'cr-blanc1c',c:'cr',k:'revue',min:45,txt:'Correction du blanc : noter les themes sous le seuil'});
+  fx(pdAdd(cr,-2),{id:'cr-blanc2',c:'cr',k:'qcm',min:35,txt:'Mock officiel CR #1 (18 QCM, 35 min) puis correction',ref:'#/pt/cr-gen-mock1'});
+  fx(pdAdd(cr,-1),{id:'cr-final',c:'cr',k:'revue',min:90,txt:'Revision finale : mes fautes en active recall + flashcards des sessions faibles',ref:'#/rev'});
+  fx(pdAdd(da,-4),{id:'da-mock1',c:'da',k:'qcm',min:60,txt:'Mock DA officiel en conditions reelles, puis correction',ref:'#/pt'});
+  fx(pdAdd(da,-1),{id:'da-final',c:'da',k:'revue',min:90,txt:'Revision finale DA : mes fautes + flashcards des sessions faibles',ref:'#/rev'});
+  var allT={cr:planGen('cr',seenCR), da:planGen('da',seenDA)};
+  /* passe 2 (espacement) : en fin de file, pour remplir les jours restants avec de la repetition utile */
+  [['cr',32],['da',12]].forEach(function(cfg){ var c=cfg[0]; for(var b0=1;b0<=cfg[1];b0+=4){ var b1=Math.min(cfg[1],b0+3);
+    allT[c].push({id:c+'-p2-'+b0, c:c, k:'qcm', min:40, txt:'Passe 2 : QCM melange des sessions '+b0+' a '+b1+', puis mes fautes', ref:'#/qb'}); } });
+  var total=0, doneMin=0, perC={cr:{t:0,d:0},da:{t:0,d:0}};
+  var queue={cr:[],da:[]};
+  ['cr','da'].forEach(function(c){
+    allT[c].concat(Object.keys(fixed).reduce(function(a,d){ return a.concat(fixed[d].filter(function(x){ return x.c===c; })); },[])).forEach(function(t){
+      var isDone = !!done[t.id] || (t.auto && t.auto());
+      total+=t.min; perC[c].t+=t.min; if(isDone){ doneMin+=t.min; perC[c].d+=t.min; }
+      t.isDone=isDone; t.doneToday = !!done[t.id] && pdKey(new Date(done[t.id]))===today;
+    });
+    queue[c]=allT[c].filter(function(t){ return !t.isDone; });
+  });
+  /* calendrier */
+  var days=[], capFor=function(ds){ var p=ds.split('-'), wd=new Date(+p[0],+p[1]-1,+p[2]).getDay(); return ds===today?180:(wd===0?120:(wd===6?150:240)); };
+  var endAll=pdAdd(da,-1), over=[];
+  for(var ds=today; ds<=endAll; ds=pdAdd(ds,1)){
+    var items=[], capCR=0, capDA=0, cap=capFor(ds);
+    var fixedHere=(fixed[ds]||[]).filter(function(t){ return !t.isDone; });
+    var used=fixedHere.reduce(function(a,t){ return a+t.min; },0);
+    items=items.concat(fixedHere);
+    var free=Math.max(0,cap-used);
+    var crOpen = ds<=last.cr && queue.cr.length, daOpen = ds<=last.da && queue.da.length;
+    var shareCR = crOpen&&daOpen ? Math.round(free*0.62) : (crOpen?free:0), shareDA = crOpen&&daOpen ? free-shareCR : (daOpen?free:0);
+    function fill(c,room){ var q=queue[c], lastDay=(ds===last[c]); while(q.length && (room>0 || lastDay)){ var t=q[0]; if(t.min>room && !lastDay && items.length && room<t.min*0.5) break; q.shift(); items.push(t); room-=t.min; if(room<=0 && !lastDay) break; } return room; }
+    var rCR=fill('cr',shareCR), rDA=fill('da',shareDA+(rCR>0?rCR:0));
+    if(rDA>0 && queue.cr.length && ds<=last.cr) fill('cr',rDA);
+    if(ds===exD.cr) items.push({k:'exam',txt:'EXAMEN CR Comprehensive A+B a 9h00, allege, rien de nouveau'});
+    days.push({d:ds, items:items});
+  }
+  [fixed].forEach(function(){});
+  var leftover=queue.cr.concat(queue.da); 
+  /* taches terminees aujourd'hui, pour pouvoir decocher */
+  var doneToday=[]; ['cr','da'].forEach(function(c){ allT[c].concat(Object.keys(fixed).reduce(function(a,d){ return a.concat(fixed[d].filter(function(x){ return x.c===c; })); },[])).forEach(function(t){ if(t.doneToday) doneToday.push(t); }); });
+  if(days.length) days[0].items=doneToday.concat(days[0].items);
+  /* jour d'examen DA */
+  if(!days.some(function(d){ return d.d===exD.da; })) days.push({d:exD.da,items:[{k:'exam',txt:'EXAMEN DA a 14h00, allege, rien de nouveau'}]});
+  return {exams:P.exams, days:days, total:total, done:doneMin, perC:perC, leftover:leftover, seen:{cr:seenCR,da:seenDA}};
+}
 function vPlan(){
-  var plan = D.PLAN || {exams:[], days:[]};
-  var chk = store.planChecks || (store.planChecks = {});
-  function dkey(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
-  var today = dkey(new Date());
-  var WD = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
-  var MO = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
-  var CL = {cr:'CR', da:'DA', fm:'FM', cg:'CG', adm:'Admin', div:'Divers'};
+  var m=planModel(), today=pdKey(new Date());
+  var WD=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var MO=['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+  var CL={cr:'CR',da:'DA',adm:'Admin'};
   function fdate(ds){ var p=ds.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]); return WD[d.getDay()]+' '+d.getDate()+' '+MO[d.getMonth()]; }
-  function fmin(m){ return m>=90 ? (Math.round(m/6)/10)+' h' : m+' min'; }
-  var tot=0, done=0, perC={}, perCDone={};
-  plan.days.forEach(function(dy){ dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam') return; var m=it.min||0; tot+=m; perC[it.c]=(perC[it.c]||0)+m; if(chk[dy.d+'|'+i]){ done+=m; perCDone[it.c]=(perCDone[it.c]||0)+m; } }); });
-  var pct = tot ? Math.round(done*100/tot) : 0;
-  var chips = plan.exams.map(function(e){
-    var dd = ptDays(e.date), dt = new Date(e.date);
-    var dtl = dt.getDate()+' '+MO[dt.getMonth()].slice(0,3)+' &middot; '+('0'+dt.getHours()).slice(-2)+'h'+('0'+dt.getMinutes()).slice(-2);
-    return '<div class="plchip pl-'+e.c+'"><b>'+esc(e.label)+'</b><span>'+dtl+(dd!=null&&dd>=0?' &middot; J-'+dd:'')+'</span>'+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</div>';
+  function fmin(x){ return x>=90 ? (Math.round(x/6)/10)+' h' : x+' min'; }
+  var pct=m.total?Math.round(m.done*100/m.total):0;
+  var chips=m.exams.filter(function(e){ return e.c==='cr'||e.c==='da'; }).map(function(e){
+    var dd=ptDays(e.date), dt=new Date(e.date);
+    return '<div class="plchip pl-'+e.c+'"><b>'+esc(e.label)+'</b><span>'+dt.getDate()+' '+MO[dt.getMonth()].slice(0,3)+' &middot; '+('0'+dt.getHours()).slice(-2)+'h'+('0'+dt.getMinutes()).slice(-2)+(dd!=null&&dd>=0?' &middot; J-'+dd:'')+'</span></div>';
   }).join('');
-  var courseRows = ['cr','cg','fm','da'].filter(function(c){ return perC[c]; }).map(function(c){
-    var t=perC[c], d=perCDone[c]||0, p=t?Math.round(d*100/t):0;
-    return '<div class="plcours"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700"><span><b class="plc pl-'+c+'">'+CL[c]+'</b>'+esc(courseOf(c).name)+'</span><span>'+fmin(d)+' / '+fmin(t)+'</span></div><div class="bar"><i data-w="'+p+'"></i></div></div>';
-  }).join('');
-  var fmNote = plan.fmNote ? '<div class="plday plfm"><div class="pldate">Perimetre FM</div><div class="plitem ploff" style="font-style:normal">'+esc(plan.fmNote)+'</div></div>' : '';
-  var rulesHtml = (plan.rules&&plan.rules.length) ? '<div class="plday plfm"><div class="pldate">Regles du plan</div>'+plan.rules.map(function(r){ return '<div class="plitem ploff" style="font-style:normal"><span>'+esc(r)+'</span></div>'; }).join('')+'</div>' : '';
-  function itemHTML(dyD, it, i){
-    var k = dyD+'|'+i, on = chk[k] ? 1 : 0;
+  var rows=['cr','da'].map(function(c){ var t=m.perC[c].t, d=m.perC[c].d, p=t?Math.round(d*100/t):0;
+    return '<div class="plcours"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700"><span><b class="plc pl-'+c+'">'+CL[c]+'</b>'+esc(courseOf(c).name)+' &middot; session '+m.seen[c]+'</span><span>'+fmin(d)+' / '+fmin(t)+'</span></div><div class="bar"><i data-w="'+p+'"></i></div></div>'; }).join('');
+  function item(dyD,it){
     if(it.k==='exam') return '<div class="plitem plexam"><span class="pltag">EXAMEN</span><span>'+esc(it.txt)+'</span></div>';
-    if(it.k==='off') return '<div class="plitem ploff"><span>'+esc(it.txt)+'</span></div>';
-    var link = it.ref ? ' <a class="plgo" href="'+esc(it.ref)+'">ouvrir &rarr;</a>' : '';
-    var dur = it.min ? ' <span class="plmin">'+it.min+' min</span>' : '';
-    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+k+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CL[it.c]||it.c)+'</b>'+esc(it.txt)+dur+link+'</span></div>';
+    var on=it.isDone?1:0;
+    return '<div class="plitem'+(on?' pldone':'')+'"><button class="plck'+(on?' on':'')+'" data-act="plchk" data-k="'+esc(it.id)+'">'+(on?'&#10003;':'')+'</button><span class="pltx"><b class="plc pl-'+it.c+'">'+esc(CL[it.c]||it.c)+'</b>'+esc(it.txt)+' <span class="plmin">'+it.min+' min</span>'+(it.ref?' <a class="plgo" href="'+esc(it.ref)+'">ouvrir &rarr;</a>':'')+'</span></div>';
   }
   function dayBlock(dy){
-    var load = dy.items.reduce(function(a,it){ return a+((it.k==='off'||it.k==='exam')?0:(it.min||0)); },0);
-    var cls = 'plday'+(dy.d===today?' pltoday':'')+(dy.d<today?' plpast':'');
-    return '<div class="'+cls+'"><div class="pldate">'+fdate(dy.d)+(dy.d===today?' &middot; aujourd\'hui':'')+(load?' &middot; ~'+fmin(load):'')+'</div>'+dy.items.map(function(it,i){ return itemHTML(dy.d,it,i); }).join('')+'</div>';
+    var load=dy.items.reduce(function(a,it){ return a+(it.k==='exam'||it.isDone?0:it.min); },0);
+    return '<div class="plday'+(dy.d===today?' pltoday':'')+'"><div class="pldate">'+fdate(dy.d)+(dy.d===today?' &middot; aujourd\'hui':'')+(load?' &middot; ~'+fmin(load):'')+'</div>'+(dy.items.length?dy.items.map(function(it){ return item(dy.d,it); }).join(''):'<div class="plitem ploff"><span>Journee libre.</span></div>')+'</div>';
   }
-  var overdue = [];
-  plan.days.forEach(function(dy){ if(dy.d>=today) return; dy.items.forEach(function(it,i){ if(it.k==='off'||it.k==='exam'||chk[dy.d+'|'+i]) return; overdue.push({d:dy.d, it:it, i:i}); }); });
-  var odHtml = overdue.length
-    ? '<div class="plday plod"><div class="pldate">En retard &middot; '+overdue.length+' tache'+(overdue.length>1?'s':'')+' a rattraper</div>'+overdue.map(function(o){ return '<div class="plodd">'+fdate(o.d)+'</div>'+itemHTML(o.d,o.it,o.i); }).join('')+'</div>'
-    : '';
-  var todayDay = null, upcoming = [];
-  plan.days.forEach(function(dy){ if(dy.d===today) todayDay=dy; else if(dy.d>today) upcoming.push(dy); });
-  var todayHtml = todayDay ? dayBlock(todayDay) : '<div class="plday pltoday"><div class="pldate">'+fdate(today)+' &middot; aujourd\'hui</div><div class="plitem ploff"><span>Rien de prevu au plan aujourd\'hui.</span></div></div>';
+  var over=m.leftover.length ? '<div class="hwarn">'+m.leftover.length+' tache'+(m.leftover.length>1?'s':'')+' ('+fmin(m.leftover.reduce(function(a,t){ return a+t.min; },0))+') ne tiennent pas avant les examens au rythme actuel. Elles sont classees par priorite : saute d\'abord les exercices du livre des chapitres les moins importants.</div>' : '';
+  var today0=m.days.filter(function(d){ return d.d===today; })[0], rest=m.days.filter(function(d){ return d.d>today; });
   return '<div class="page-h">Plan de revision</div>'
-    + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits. La charge de chaque jour est indiquee en minutes.</div>'
+    + '<div class="page-sub">Recale sur ta position : CR session '+m.seen.cr+', DA session '+m.seen.da+'. Le plan se recalcule tout seul quand tu avances, il n\'y a jamais de retard.</div>'
     + '<div class="plchips">'+chips+'</div>'
-    + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+fmin(done)+' / '+fmin(tot)+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div><div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">'+courseRows+'</div></div>'
-    + mistakesBlock()
-    + rulesHtml + fmNote
-    + odHtml + todayHtml
+    + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+fmin(m.done)+' / '+fmin(m.total)+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div><div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">'+rows+'</div></div>'
+    + over + mistakesBlock()
+    + (today0?dayBlock(today0):'')
     + '<div class="pldate" style="margin-top:20px">A venir</div>'
-    + upcoming.map(dayBlock).join('');
+    + rest.map(dayBlock).join('');
 }
 
 /* ---------- SEARCH ---------- */
@@ -1552,7 +1603,7 @@ document.addEventListener('click', function(e){
   if(a){
     var act = a.getAttribute('data-act');
     if(act==='search'){ openSearch(); return; }
-    if(act==='plchk'){ var pk=a.getAttribute('data-k'); var pc=store.planChecks||(store.planChecks={}); if(pc[pk]) delete pc[pk]; else pc[pk]=1; save(); render(); return; }
+    if(act==='plchk'){ var pk=a.getAttribute('data-k'), pdm=planDoneMap(); if(pdm[pk]) delete pdm[pk]; else pdm[pk]=Date.now(); save(); render(); return; }
     if(act==='fiche'){ store.fiches[a.getAttribute('data-cid')+'-'+a.getAttribute('data-n')] = true; save(); return; /* laisse le lien s'ouvrir */ }
     if(act==='ans'){ answerQuiz(parseInt(a.getAttribute('data-i'),10)); return; }
     if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
