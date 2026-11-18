@@ -511,6 +511,7 @@ function exCardHtml(c,pos){
       if(has) h+='<div class="exfb '+(a===q.k?'ok':'ko')+'"><b>'+(a===q.k?'Correct.':'Not quite. The correct answer is '+'ABCD'[q.k]+'.')+'</b> '+exExp(q.e)+'<div class="exfb-a"><button type="button" class="exshow" data-act="exreset" data-n="'+i.n+'" data-key="'+key+'">Try again</button></div>'+exMethHtml(c,i)+'</div>';
       h+='</div>';
     });
+    if(multi&&qs.some(function(q,j){return exHas(exKey(i,j));})) h+='<div class="exfb-a"><button type="button" class="exshow" data-act="exredo" data-n="'+i.n+'">Redo the whole exercise</button></div>';
     if(i.np&&i.np.length) h+='<div class="exq nq">No multiple choice for part'+(i.np.length>1?'s ':' ')+i.np.map(function(x){return '('+x+')';}).join(', ')+' (calculation or worked solution). Work '+(i.np.length>1?'them':'it')+' on paper, then check the book answer'+(i.a?' on PDF p. '+i.a:'')+'.</div>';
     if(allDone) h+='<div class="exfb-a">'+nextBtn+'</div>';
     else h+='<div class="exhint">Pick A to D. Keys A, B, C, D also work.</div>';
@@ -534,6 +535,12 @@ function exPlayerHtml(c,pos){
   var skip=pos<c.items.length?'<button type="button" class="cta" data-go="#/ex/'+c.n+'/'+(pos+2)+'">Skip &rarr;</button>':'<span></span>';
   return h+'<div class="exnav">'+prev+skip+'</div></div>';
 }
+function exChStats(c){ var a=0,w=0; c.items.forEach(function(i){ var bad=false; exQs(i).forEach(function(q,j){ var k=exKey(i,j); if(exHas(k)){ a++; if(exAns(k)!==q.k) bad=true; } }); if(bad) w++; if(exDone(i.n)) a++; }); return {a:a,w:w}; }
+function exToolbar(c){
+  var st=exChStats(c); if(!st.a) return '';
+  return '<div class="extool">'+(st.w?'<button type="button" class="cta pri" data-act="exredowrong" data-ch="'+c.n+'">Redo my '+st.w+' mistake'+(st.w>1?'s':'')+'</button>':'')
+    +'<button type="button" class="cta" data-act="exrestart" data-ch="'+c.n+'">Redo the whole chapter</button></div>';
+}
 function exRefresh(n){
   var f=exFind(n); if(!f) return; var el=document.getElementById('explayer');
   if(el){ var t=document.createElement('div'); t.innerHTML=exPlayerHtml(f.c,f.pos); el.replaceWith(t.firstChild); }
@@ -551,6 +558,7 @@ function vEx(ch,k){
       + '<div class="page-h">Chapter '+c.n+' &middot; '+esc(c.t)+'</div>'
       + '<div class="page-sub">'+c.items.length+' exercises'+(c.s.length?' &middot; sessions '+c.s.join(', '):'')+' &middot; <span id="ex-score">'+sc.ok+' correct out of '+sc.a+' answered</span></div>'
       + (CR_SUPP[c.n]||[]).map(function(f){ return '<div class="exsupp"><a href="'+f.u+'?v=20261116" target="_blank" rel="noopener"><b>'+f.t+'</b></a> &middot; '+f.d+'</div>'; }).join('')
+      + exToolbar(c)
       + exPlayerHtml(c,pos);
   }
   return exIndexHtml(E,tt,sc);
@@ -1635,7 +1643,9 @@ document.addEventListener('click', function(e){
     if(act==='exsess'){ var sk=parseInt(a.getAttribute('data-s'),10); store.exSess=sk; save(); var L=exChaptersForSession(sk), tg=L[0]; for(var q=0;q<L.length;q++){ if(exFirstOpen(L[q])<L[q].items.length){ tg=L[q]; break; } } if(tg) location.hash='#/ex/'+tg.n; e.preventDefault(); return; }
     if(act==='exchap'){ store.exSess=null; save(); location.hash='#/ex/'+a.getAttribute('data-ch'); e.preventDefault(); return; }
     if(act==='exdone'){ var dn=a.getAttribute('data-n'); store.exDone=store.exDone||{}; if(store.exDone[dn]) delete store.exDone[dn]; else store.exDone[dn]=1; save(); exRefresh(dn); e.preventDefault(); return; }
-    if(act==='exrestart'){ var rc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(rc){ rc.items.forEach(function(i){ exQs(i).forEach(function(q,j){ if(store.exAns) delete store.exAns[exKey(i,j)]; }); if(store.exDone) delete store.exDone[i.n]; }); save(); location.hash='#/ex/'+rc.n+'/1'; render(); } e.preventDefault(); return; }
+    if(act==='exredo'){ var on=a.getAttribute('data-n'), of=exFind(on); if(of){ exQs(of.c.items[of.pos]).forEach(function(q,j){ if(store.exAns) delete store.exAns[exKey(of.c.items[of.pos],j)]; }); save(); exRefresh(on); } e.preventDefault(); return; }
+    if(act==='exredowrong'){ var wc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(wc){ var fp=-1; wc.items.forEach(function(i,pos){ var bad=false; exQs(i).forEach(function(q,j){ var k=exKey(i,j); if(exHas(k)&&exAns(k)!==q.k) bad=true; }); if(bad){ exQs(i).forEach(function(q,j){ if(store.exAns) delete store.exAns[exKey(i,j)]; }); if(store.exDone) delete store.exDone[i.n]; if(fp<0) fp=pos; } }); save(); location.hash='#/ex/'+wc.n+'/'+(fp+1); render(); } e.preventDefault(); return; }
+    if(act==='exrestart'){ if(!confirm('Erase all your answers for this chapter and start again?')){ e.preventDefault(); return; } var rc=exData().chapters.filter(function(x){return String(x.n)===a.getAttribute('data-ch');})[0]; if(rc){ rc.items.forEach(function(i){ exQs(i).forEach(function(q,j){ if(store.exAns) delete store.exAns[exKey(i,j)]; }); if(store.exDone) delete store.exDone[i.n]; }); save(); location.hash='#/ex/'+rc.n+'/1'; render(); } e.preventDefault(); return; }
     if(act==='qnext'){ quiz.idx++; render(); return; }
     if(act==='qprev'){ quiz.idx=Math.max(0,quiz.idx-1); render(); return; }
     if(act==='qskip'){ quiz.idx++; render(); return; }
