@@ -210,6 +210,7 @@ function parseHash(){
   var p = h.split('/').filter(Boolean);
   if(!p.length) return {page:'home'};
   if(p[0]==='plan') return {page:'plan'};
+  if(p[0]==='rc'&&p[1]) return {page:'recall', course:p[1]};
   if(p[0]==='c'&&p[1]) return {page:'course', course:p[1]};
   if(p[0]==='s'&&p[1]&&p[2]!=null) return {page:'session', course:p[1], n:p[2]};
   if(p[0]==='qb') return p[1]==='play' ? {page:'qplay'} : {page:'qbuilder'};
@@ -631,6 +632,7 @@ function vHome(){
   + '<button class="stat" data-go="#/c/'+state.course+'"><b>'+masteredTopics()+'</b><span>themes maitrises</span><small>&ge;80% de reussite</small></button>'
   + '</div>'
   + srsCard()
+  + mistakesBlock()
   + (exData() ? '<div class="card" style="margin-bottom:18px"><h2>Textbook exercises</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Every end of chapter exercise of Corporate Reporting, as in the book, answered as a multiple choice question.</p><button class="cta pri" data-go="#/ex">Open by chapter &rarr;</button></div>' : '')
   + '<div class="card" style="margin-bottom:18px"><h2>Préparer l&#39;examen global de CR</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/cr-gen-mock1"><span class="pt-item-t"><b>Mock officiel CR #1</b><span>18 QCM · 35 min · corrigé détaillé</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt"><span class="pt-item-t"><b>Tous les mocks et partiels blancs</b><span>5 mocks officiels, review session du prof, blancs Partie A et B</span></span><span class="pt-new">Ouvrir</span></button></div></div>'
   + '<div class="card" style="margin-bottom:18px"><h2>Mes moyennes</h2><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Saisis ta note pour chaque épreuve et suis ta moyenne par matière. Les coefficients viennent des consignes officielles des cours.</p><button class="cta pri" data-go="#/moy">Ouvrir mes moyennes &rarr;</button></div>'
@@ -858,6 +860,7 @@ function vQBuilder(){
 }
 function startCustomQuiz(retry){
   if(retry && quiz && quiz.custom && quiz.custom.srs){ startSrsQuiz(quiz.custom.course); return; }
+  if(retry && quiz && quiz.custom && quiz.custom.mist){ startMistakeQuiz(quiz.custom.course); return; }
   if(!retry || !quiz || quiz.src!=='custom'){ var params={course:qb.course, session:qb.session, level:qb.level, count:qb.count}; }
   else { var params=quiz.custom; qb.course=params.course; qb.session=params.session; qb.level=params.level; qb.count=params.count; }
   var pool=qbPool(params.course, params.session, params.level).slice();
@@ -868,6 +871,7 @@ function startCustomQuiz(retry){
   if(location.hash==='#/qb/play') render(); else go('#/qb/play');
 }
 function qbTitle(){
+  if(quiz.custom && quiz.custom.mist) return 'Mes fautes · '+courseOf(quiz.custom.course).name;
   if(quiz.custom && quiz.custom.srs) return 'Révision du jour · '+courseOf(quiz.custom.course).name;
   var p=quiz.custom, parts=[courseOf(p.course).name];
   if(p.session==='all') parts.push('toutes sessions');
@@ -1048,6 +1052,116 @@ function vDeadlines(){
   + '</div></aside></div>';
 }
 
+/* ---------- FAUTES A REVOIR (QCM, exercices, flashcards) ---------- */
+function recallLog(){ return store.recall || (store.recall=[]); }
+function mistakeStates(cid){
+  var ev={};
+  store.attempts.forEach(function(a){ if(a.course!==cid) return; var k=progressKey(a.course,a.session,a.questionId); (ev[k]=ev[k]||[]).push({ok:a.correct, ts:a.ts}); });
+  recallLog().forEach(function(r){ if(r.cid!==cid) return; (ev[r.k]=ev[r.k]||[]).push({ok:r.ok, ts:r.ts}); });
+  var m={};
+  Object.keys(ev).forEach(function(k){
+    var wrong=0, streak=0;
+    ev[k].sort(function(a,b){ return a.ts-b.ts; }).forEach(function(e){ if(e.ok) streak++; else { wrong++; streak=0; } });
+    m[k]={wrong:wrong, streak:streak};
+  });
+  return m;
+}
+/* une faute reste dans la liste tant qu'elle n'a pas ete reussie 2 fois de suite (QCM ou active recall) */
+function mistakePool(cid){
+  var st=mistakeStates(cid), out=[];
+  qbPool(cid,'all',0).forEach(function(q){ var s=st[questionProgressKey(cid,q)]; if(s && s.wrong>0 && s.streak<2) out.push({q:q, streak:s.streak, r:Math.random()}); });
+  out.sort(function(a,b){ return a.streak-b.streak || a.r-b.r; });
+  return out.map(function(o){ return o.q; });
+}
+function exMistakes(){
+  var E=exData(), r=[]; if(!E) return r;
+  E.chapters.forEach(function(c){ c.items.forEach(function(i,pos){
+    if(exQs(i).some(function(q,j){ var k=exKey(i,j); return exHas(k) && exAns(k)!==q.k; })) r.push({c:c,pos:pos,i:i});
+  }); });
+  return r;
+}
+function mistakeTotals(){
+  var t=0; COURSES.forEach(function(c){ t+=mistakePool(c.id).length; }); return t+exMistakes().length;
+}
+function startMistakeQuiz(cid){
+  var pool=mistakePool(cid).slice(0,20);
+  if(!pool.length) return;
+  quiz = {cid:cid, n:'custom', src:'custom', bank:shuf(pool), idx:0, answered:{}, sel:null, t0:Date.now(), ok:0, custom:{course:cid, session:'all', level:0, count:'20', mist:true}};
+  if(location.hash==='#/qb/play') render(); else go('#/qb/play');
+}
+var rcs = null;
+function startRecall(cid, silent){
+  var p=mistakePool(cid).slice(0,20);
+  rcs = {cid:cid, bank:p, idx:0, rev:false, ok:0, ko:[]};
+  if(silent || !p.length) return;
+  if(location.hash==='#/rc/'+cid) render(); else go('#/rc/'+cid);
+}
+function rcAnswer(ok){
+  var q=rcs.bank[rcs.idx];
+  recallLog().push({cid:rcs.cid, k:questionProgressKey(rcs.cid,q), ok:!!ok, ts:Date.now()});
+  save();
+  if(ok) rcs.ok++; else rcs.ko.push(q);
+  rcs.idx++; rcs.rev=false; render();
+}
+function vRecall(cid){
+  if(!rcs || rcs.cid!==cid){ startRecall(cid,true); }
+  if(!rcs.bank.length){ location.replace('#/plan'); return ''; }
+  var total=rcs.bank.length, c=courseOf(cid);
+  var head='<button class="back" data-go="#/plan">&larr; Plan de revision</button><div class="page-h">Active recall &middot; mes fautes &middot; '+esc(c.name)+'</div>';
+  if(rcs.idx>=total){
+    var left=mistakePool(cid).length;
+    return head+'<div class="qcard" style="text-align:center;padding:30px 20px"><div class="score-big">'+rcs.ok+' / '+total+'</div>'
+      + '<p style="color:var(--muted);font-weight:600;margin:6px 0 4px">retrouvees de memoire</p>'
+      + '<p style="font-size:13px;margin-bottom:18px">'+(left ? left+' faute'+(left>1?'s':'')+' encore a consolider. Une faute disparait de la liste quand tu la reussis 2 fois de suite, en recall ou en QCM, donc elle reviendra.' : 'Plus aucune faute en attente pour cette matiere.')+'</p>'
+      + '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'
+      + (rcs.ko.length ? '<button class="cta pri" data-act="rcretry">Refaire les '+rcs.ko.length+' rat&eacute;e'+(rcs.ko.length>1?'s':'')+'</button>' : '')
+      + (left ? '<button class="cta line" data-act="mqstart" data-cid="'+cid+'">Me tester en QCM</button>' : '')
+      + '<button class="cta line" data-go="#/plan">Retour au plan</button></div></div>';
+  }
+  var q=rcs.bank[rcs.idx], fu=ficheUrl(cid,q.session);
+  var body;
+  if(!rcs.rev){
+    body='<div class="qq">'+esc(q.question)+'</div>'
+      + '<div class="expl" style="margin:14px 0"><b>Avant de regarder :</b> donne la reponse a voix haute ou sur papier, avec le raisonnement, puis r&eacute;v&egrave;le.</div>'
+      + '<div class="qfoot"><span style="font-size:11.5px;color:var(--muted);font-weight:600">Tu t&#39;etais tromp&eacute;(e) sur celle-ci</span><button class="cta pri" data-act="rcreveal">R&eacute;v&eacute;ler la r&eacute;ponse</button></div>';
+  } else {
+    var opts=q.choices.map(function(ch,i){ return '<div class="opt '+(i===q.correct_index?'right':'dim')+'" style="cursor:default"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></div>'; }).join('');
+    body='<div class="qq">'+esc(q.question)+'</div>'+opts
+      + (q.explanation ? '<div class="expl"><b>Pourquoi :</b> '+esc(q.explanation)+'</div>' : '')
+      + (fu ? '<p style="font-size:12.5px;margin:10px 0 0"><a href="'+esc(fu)+'" target="_blank" rel="noopener">Relire la fiche de la session &rarr;</a></p>' : '')
+      + '<div class="qfoot"><button class="cta line" data-act="rcmiss">Je ne l&#39;avais pas</button><button class="cta pri" data-act="rcknow">Je l&#39;avais</button></div>';
+  }
+  return head+'<div class="qcard"><div class="qmeta"><span>'+(rcs.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(rcs.idx/total*100)+'%"></i></div><span>'+rcs.ok+' retrouv&eacute;es</span></div>'+body+'</div>';
+}
+function mistakesBlock(){
+  var rows='', total=0;
+  COURSES.forEach(function(c){
+    var p=mistakePool(c.id); if(!p.length) return;
+    total+=p.length;
+    var tc={}; p.forEach(function(q){ if(q.topic) tc[q.topic]=(tc[q.topic]||0)+1; });
+    var top=Object.keys(tc).sort(function(a,b){ return tc[b]-tc[a]; }).slice(0,3).join(' &middot; ');
+    rows+='<div class="pt-item" style="cursor:default;flex-wrap:wrap"><span class="pt-item-t"><b>'+esc(c.name)+' &middot; '+p.length+' question'+(p.length>1?'s':'')+' rat&eacute;e'+(p.length>1?'s':'')+'</b>'+(top?'<span>'+top+'</span>':'')+'</span>'
+      + '<button class="cta pri" style="padding:9px 14px;font-size:12.5px" data-act="rcstart" data-cid="'+c.id+'">Active recall</button>'
+      + '<button class="cta line" style="padding:9px 14px;font-size:12.5px" data-act="mqstart" data-cid="'+c.id+'">QCM</button></div>';
+  });
+  var ex=exMistakes();
+  if(ex.length){
+    total+=ex.length;
+    rows+='<div class="pt-item" style="cursor:default;flex-wrap:wrap"><span class="pt-item-t"><b>CR &middot; '+ex.length+' exercice'+(ex.length>1?'s':'')+' du livre rat&eacute;'+(ex.length>1?'s':'')+'</b><span>'+ex.slice(0,6).map(function(x){ return 'Ex. '+esc(x.i.n); }).join(' &middot; ')+(ex.length>6?' ...':'')+'</span></span>'
+      + '<button class="cta pri" style="padding:9px 14px;font-size:12.5px" data-go="#/ex/'+ex[0].c.n+'/'+(ex[0].pos+1)+'">Refaire</button></div>';
+  }
+  COURSES.forEach(function(c){
+    var d=fcDueCount(c.id).due; if(!d) return;
+    total+=d;
+    rows+='<div class="pt-item" style="cursor:default;flex-wrap:wrap"><span class="pt-item-t"><b>'+esc(c.name)+' &middot; '+d+' flashcard'+(d>1?'s':'')+' &agrave; revoir</b><span>rat&eacute;es ou arriv&eacute;es &agrave; &eacute;ch&eacute;ance</span></span>'
+      + '<button class="cta line" style="padding:9px 14px;font-size:12.5px" data-go="#/f/'+c.id+'/due">Reviser</button></div>';
+  });
+  if(!total) return '<div class="card" style="margin-bottom:18px"><h2>Mes fautes &agrave; revoir</h2><p style="font-size:13px;color:var(--muted);margin:0">Aucune faute en attente. Chaque question rat&eacute;e en QCM ou en exercice appara&icirc;tra ici jusqu&#39;&agrave; ce que tu la r&eacute;ussisses deux fois de suite.</p></div>';
+  return '<div class="card plmist" style="margin-bottom:18px;border:1.5px solid var(--warn)"><h2>Mes fautes &agrave; revoir &middot; '+total+'</h2>'
+    + '<p style="font-size:13px;color:var(--muted);margin:0 0 14px">Tout ce que tu as rat&eacute; revient ici tant que ce n&#39;est pas ma&icirc;tris&eacute;. Commence par l&#39;active recall (r&eacute;pondre de m&eacute;moire avant de voir la solution), puis v&eacute;rifie en QCM. Une faute sort de la liste apr&egrave;s deux r&eacute;ussites de suite.</p>'
+    + '<div class="pt-items">'+rows+'</div></div>';
+}
+
 /* ---------- PLAN DE REVISION ---------- */
 function vPlan(){
   var plan = D.PLAN || {exams:[], days:[]};
@@ -1098,6 +1212,7 @@ function vPlan(){
     + '<div class="page-sub">Plan actif jusqu\'aux examens de decembre. Coche les taches au fur et a mesure : les retards remontent en haut de page tant qu\'ils ne sont pas faits. La charge de chaque jour est indiquee en minutes.</div>'
     + '<div class="plchips">'+chips+'</div>'
     + '<div class="card" style="margin-bottom:18px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:4px"><span>Progression du plan</span><span>'+fmin(done)+' / '+fmin(tot)+' &middot; '+pct+'%</span></div><div class="bar"><i data-w="'+pct+'"></i></div><div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">'+courseRows+'</div></div>'
+    + mistakesBlock()
     + rulesHtml + fmNote
     + odHtml + todayHtml
     + '<div class="pldate" style="margin-top:20px">A venir</div>'
@@ -1163,6 +1278,7 @@ function render(){
     case 'cheat': content = vCheat(r.course); break;
     case 'deadlines': content = vDeadlines(); break;
     case 'plan': content = vPlan(); break;
+    case 'recall': content = vRecall(r.course); break;
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
     case 'moyennes': content = vMoyennes(); break;
@@ -1194,6 +1310,12 @@ document.addEventListener('click', function(e){
     if(act==='qbset'){ qbSet(a.getAttribute('data-k'), a.getAttribute('data-v')); return; }
     if(act==='qblaunch'){ startCustomQuiz(); return; }
     if(act==='qbretry'){ startCustomQuiz(true); return; }
+    if(act==='rcstart'){ startRecall(a.getAttribute('data-cid')); return; }
+    if(act==='rcreveal'){ rcs.rev=true; render(); return; }
+    if(act==='rcknow'){ rcAnswer(true); return; }
+    if(act==='rcmiss'){ rcAnswer(false); return; }
+    if(act==='rcretry'){ rcs.bank=rcs.ko.slice(); rcs.idx=0; rcs.rev=false; rcs.ok=0; rcs.ko=[]; render(); return; }
+    if(act==='mqstart'){ startMistakeQuiz(a.getAttribute('data-cid')); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
         if(act==='exans'){ var xn=a.getAttribute('data-n'), xk=a.getAttribute('data-key'); store.exAns=store.exAns||{}; if(store.exAns[xk]===undefined){ store.exAns[xk]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
     if(act==='exreset'){ var rn=a.getAttribute('data-n'), rk=a.getAttribute('data-key'); if(store.exAns) delete store.exAns[rk]; save(); exRefresh(rn); e.preventDefault(); return; }
