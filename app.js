@@ -237,12 +237,38 @@ function ptItem(id){ return ((D.PARTIELS||{}).items||{})[id] || null; }
 function ptDays(dateStr){ var d=new Date(dateStr); if(isNaN(d)) return null; var now=new Date(); if(d.getTime()<now.getTime()) return -1; var a=new Date(d.getFullYear(),d.getMonth(),d.getDate()), c=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return Math.round((a-c)/86400000); }
 function ptScores(){ try{ return JSON.parse(localStorage.getItem('c40-pt-v1')||'{}'); }catch(e){ return {}; } }
 function ptScore(id){ var s=ptScores()[id] || null; if(s) s.stale=(s.revision||1)!==((ptItem(id)||{}).revision||1); return s; }
-function ptSaveScore(id, ok, total){ var s=ptScores(); s[id]={ok:ok,total:total,ts:Date.now(),revision:(ptItem(id)||{}).revision||1}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
+function ptSaveScore(id, ok, total){ var s=ptScores(), o=s[id]||{}; s[id]={ok:ok,total:total,ts:Date.now(),revision:(ptItem(id)||{}).revision||1,best:Math.max(o.best||0,ok),n:(o.n||0)+1,hist:((o.hist||[]).concat([{ok:ok,total:total,ts:Date.now()}])).slice(-12)}; try{ localStorage.setItem('c40-pt-v1', JSON.stringify(s)); }catch(e){} }
 function ptTotal(){ return ptb ? ptb.item.mcq.length + ptb.item.open.length : 0; }
-function ptStart(id){ var it=ptItem(id); if(!it||it.type!=='blanc') return; ptb={itemId:id, item:it, idx:0, phase:'run', ans:{}, texts:{}}; render(); }
+function ptStart(id){ var it=ptItem(id); if(!it||it.type!=='blanc') return; ptb={itemId:id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now()}; render(); }
+function ptShuf(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+/* Blanc genere: 18 QCM niveau Difficile ou Expert, 2/3 de calculs, sessions 1 a 14 melangees. kind 'weak' = priorite a ce que tu as rate ou pas encore vu */
+function ptGenPool(){
+  var out=[], L=(D.QCM_LEVELS||{}).cr||{}, m=bestByQuestion();
+  for(var s=1;s<=14;s++){ (L[String(s)]||[]).forEach(function(q){ if(q.level>=2) out.push(q); }); }
+  return out.map(function(q){ var b=m[questionProgressKey('cr',q)]; return {q:q, num:/\d[\d,.]*\d/.test(q.question), st:b?(b.correct?1:3):2}; });
+}
+function ptGenBlanc(kind){
+  var pool=ptGenPool(); if(pool.length<20) return null;
+  var seen={}; try{ seen=JSON.parse(localStorage.getItem('c40-pt-genseen')||'{}'); }catch(e){}
+  pool.forEach(function(x){ x.sc=Math.random()+(seen[x.q.id]?0:1)+(kind==='weak'?x.st:0); });
+  pool.sort(function(a,b){ return b.sc-a.sc; });
+  var used={}, picks=[];
+  function take(num,n){ var c=0, cnt={}; for(var pass=0;pass<2&&c<n;pass++){ for(var i=0;i<pool.length&&c<n;i++){ var x=pool[i]; if(x.num!==num||x.used) continue; var s=String(x.q.session); if(pass===0&&(cnt[s]||0)>=2) continue; x.used=true; cnt[s]=(cnt[s]||0)+1; picks.push(x.q); c++; } } }
+  take(true,12); take(false,6);
+  picks=ptShuf(picks).slice(0,18);
+  picks.forEach(function(q){ seen[q.id]=1; }); try{ localStorage.setItem('c40-pt-genseen', JSON.stringify(seen)); }catch(e){}
+  return {id:'cr-gen-rnd', exam:'cr-gen', type:'blanc', title:kind==='weak'?'Blanc sur mes points faibles':'Nouveau blanc genere', duration:45, revision:1,
+    intro:'Dix-huit QCM tires de ta banque, niveau Difficile ou Expert, environ deux tiers de calculs, sessions 1 a 14 melangees. Chaque blanc est different.'+(kind==='weak'?' Les questions que tu as ratees passent en premier.':''),
+    formatNote:'18 QCM, une seule bonne reponse, pas de points negatifs', materialNote:'Livre et slides autorises sur l\'examen reel · calculatrice · corrige detaille a la fin',
+    mcq:picks.map(function(q){ return {session:'Session '+q.session, q:q.question, choices:q.choices, correct:q.correct_index, expl:q.explanation||''}; }), open:[]};
+}
+function ptStartGen(kind){ var it=ptGenBlanc(kind); if(!it){ alert('Les questions ne sont pas encore chargees, reessaie dans une seconde.'); return; } ptb={itemId:it.id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), gen:kind}; location.hash='#/pt/'+it.id; render(); }
+function ptRetryWrong(){ if(!ptb) return; var bad=ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]!==q.correct; }); if(!bad.length) return; var it={}; for(var k in ptb.item) it[k]=ptb.item[k]; it.title=ptb.item.title+' · mes erreurs'; it.mcq=bad; it.duration=Math.max(5,Math.round(bad.length*2.5)); ptb={itemId:ptb.itemId, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), noSave:true}; render(); }
+function ptFmtT(s){ var n=s<0, a=Math.abs(s), m=Math.floor(a/60), r=a%60; return (n?'+':'')+(m<10?'0':'')+m+':'+(r<10?'0':'')+r; }
+setInterval(function(){ var el=document.getElementById('ptTimer'); if(!el||!ptb||ptb.phase!=='run'||!ptb.t0) return; var left=Math.round((ptb.item.duration||45)*60-(Date.now()-ptb.t0)/1000); el.textContent=ptFmtT(left); el.className='pt-timer'+(left<0?' late':left<300?' low':''); },1000);
 function ptAnswer(i){ if(!ptb||ptb.phase!=='run') return; if(ptb.idx>=ptb.item.mcq.length) return; ptb.ans[ptb.idx]=i; render(); }
 function ptCapture(){ var ta=document.getElementById('ptTa'); if(ta&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=ta.value; } }
-function ptFinish(){ if(!ptb) return; ptCapture(); var ok=0; ptb.item.mcq.forEach(function(q,i){ if(ptb.ans[i]===q.correct) ok++; }); ptb.score={ok:ok, total:ptb.item.mcq.length}; ptb.phase='done'; ptSaveScore(ptb.itemId, ok, ptb.item.mcq.length); render(); }
+function ptFinish(){ if(!ptb) return; ptCapture(); var ok=0; ptb.item.mcq.forEach(function(q,i){ if(ptb.ans[i]===q.correct) ok++; }); ptb.score={ok:ok, total:ptb.item.mcq.length}; ptb.phase='done'; if(!ptb.noSave) ptSaveScore(ptb.itemId, ok, ptb.item.mcq.length); render(); }
 document.addEventListener('input', function(e){ if(e.target&&e.target.id==='ptTa'&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=e.target.value; } });
 function vPartiels(){
   var html = '<div class="page-h">Partiels</div><div class="page-sub">Must know et partiels blancs au format officiel, du plus proche au plus lointain.</div>';
@@ -255,7 +281,7 @@ function vPartiels(){
       var it = ptItem(iid); if(!it) return '';
       var det = it.type==='blanc' ? ((it.mcq.length? it.mcq.length+' QCM'+(it.open.length?(' + '):'') : '')+(it.open.length? it.open.length+' ouvertes':'')+' &middot; '+it.duration+' min') : (it.type==='official' ? 'Énoncé et corrigé sur Blackboard · connexion Bocconi' : (it.det ? esc(it.det) : 'Synthese des Must Know, session par session'));
       var sc = it.type==='blanc' ? ptScore(it.id) : null;
-      var st = sc ? '<span class="pt-done">fait &middot; '+sc.ok+'/'+sc.total+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
+      var st = sc ? '<span class="pt-done">dernier '+sc.ok+'/'+sc.total+(sc.n>1?' · meilleur '+sc.best+' · '+sc.n+' essais':'')+(sc.stale?' · ancienne version':'')+'</span>' : '<span class="pt-new">nouveau</span>';
       if(it.url) return '<a class="pt-item" style="text-decoration:none" href="'+esc(it.url)+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+(it.badge?'<span class="pt-new">'+esc(it.badge)+'</span>':'')+'</a>';
       return '<button class="pt-item" data-go="#/pt/'+it.id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
     }).join('');
@@ -268,7 +294,7 @@ function vPartiels(){
   return html;
 }
 function vPtItem(id){
-  var it = ptItem(id);
+  var it = ptItem(id) || (ptb && ptb.itemId===id ? ptb.item : null);
   if(!it) return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">Introuvable</div><div class="card"><p style="font-size:13px;color:var(--muted)">Ce contenu n&#39;existe pas.</p></div>';
   if(it.type==='official') return '<button class="back" data-go="#/pt">&larr; Partiels</button><div class="page-h">'+esc(it.title)+'</div><div class="page-sub">'+esc(it.sub)+'</div><div class="card"><p style="font-size:14px;line-height:1.7;margin-bottom:20px">'+esc(it.body)+'</p><div style="display:flex;flex-wrap:wrap;gap:12px">'+it.links.map(function(l){return '<a class="cta pri" href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.label)+'</a>';}).join('')+'</div><p style="font-size:12px;color:var(--muted);margin-top:16px">Si Blackboard demande une connexion, utilise ton compte Bocconi.'+(it.loc?' Dossier du cours : '+esc(it.loc)+'.':'')+'</p></div>';
   if(it.type==='mustknow') return '<button class="back" data-go="#/pt">&larr; Partiels</button>'
@@ -307,7 +333,7 @@ function vPtBlanc(it){
       var verdict = (mine==null) ? '<span class="pt-badge soft">sans reponse</span>' : (mine===q.correct ? '<span class="pt-done">juste</span>' : '<span class="pt-wrong">faux</span>');
       h += '<div class="qcard" style="margin-bottom:14px"><div class="qmeta"><span>QCM '+(i+1)+' &middot; '+esc(q.session)+'</span><span style="margin-left:auto">'+verdict+'</span></div>'
         + '<div class="qq">'+esc(q.q)+'</div>'+opts
-        + '<div class="expl"><b>Corrige :</b> '+esc(q.expl)+'</div></div>';
+        + '<div class="expl"><b>Corrige :</b> '+qExp(q.expl)+'</div></div>';
     });
     ptb.item.open.forEach(function(o, i){
       var txt = (ptb.texts[i]||'').trim();
@@ -316,12 +342,12 @@ function vPtBlanc(it){
         + '<div class="pt-your"><b>Ta redaction</b>'+(txt ? esc(txt) : '<i>Non redige</i>')+'</div>'
         + '<div class="expl" style="margin-top:12px"><b>Solution detaillee :</b><div class="md" style="margin-top:8px">'+mdLite(o.solution)+'</div></div></div>';
     });
-    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"><button class="cta pri" data-act="ptretry">Refaire ce partiel blanc</button><button class="cta line" data-go="#/pt">Retour aux partiels</button></div>';
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"><button class="cta pri" data-act="ptretry">'+(ptb.gen?'Refaire ces 18 QCM':'Refaire ce partiel blanc')+'</button>'+(ptb.score&&ptb.score.ok<ptb.score.total?'<button class="cta" data-act="ptwrong">Refaire mes '+(ptb.score.total-ptb.score.ok)+' erreur'+(ptb.score.total-ptb.score.ok>1?'s':'')+'</button>':'')+(ptb.gen?'<button class="cta" data-act="ptgen" data-k="'+ptb.gen+'">Nouveau blanc</button>':'')+'<button class="cta line" data-go="#/pt">Retour aux partiels</button></div>';
     return h;
   }
   var total = ptTotal(), isMcq = ptb.idx < it.mcq.length;
   var head = back + '<div class="page-h">'+esc(it.title)+'</div>'
-    + '<div class="qmeta" style="max-width:720px"><span>'+(ptb.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(ptb.idx/total*100)+'%"></i></div><span>'+(it.duration||45)+' min</span></div>';
+    + '<div class="qmeta" style="max-width:720px"><span>'+(ptb.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(ptb.idx/total*100)+'%"></i></div><span id="ptTimer" class="pt-timer">'+ptFmtT(Math.round((it.duration||45)*60-(Date.now()-(ptb.t0||Date.now()))/1000))+'</span></div>';
   var foot = '<div class="qfoot">'
     + (ptb.idx>0 ? '<button class="cta line" data-act="ptprev">&larr; Precedente</button>' : '<span></span>')
     + (ptb.idx===total-1 ? '<button class="cta pri" data-act="ptfinish">Terminer et voir le corrige</button>' : '<button class="cta pri" data-act="ptnext">Suivante &rarr;</button>')
@@ -676,11 +702,11 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('keydown',function(e){
   if(e.metaKey||e.ctrlKey||e.altKey||/^#\/ex\//.test(location.hash)) return;
   var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA'||document.querySelector('.omni')) return;
-  var opts=document.querySelectorAll('button[data-act="ans"]'); if(!opts.length) return;
+  var opts=document.querySelectorAll('button[data-act="ans"],button[data-act="ptans"]'); if(!opts.length) return;
   var k=e.key.toLowerCase(), idx='abcd'.indexOf(k); if(idx<0) idx=['1','2','3','4'].indexOf(k);
   if(idx>=0 && k.length===1){ if(opts[idx]){ opts[idx].click(); e.preventDefault(); } return; }
-  if(e.key==='Enter'||e.key==='ArrowRight'){ var n=document.querySelector('[data-act="qnext"]')||document.querySelector('[data-act="qskip"]'); if(n){ n.click(); e.preventDefault(); } }
-  if(e.key==='ArrowLeft'){ var p=document.querySelector('[data-act="qprev"]'); if(p){ p.click(); e.preventDefault(); } }
+  if(e.key==='Enter'||e.key==='ArrowRight'){ var n=document.querySelector('[data-act="qnext"]')||document.querySelector('[data-act="ptnext"]')||document.querySelector('[data-act="qskip"]'); if(n){ n.click(); e.preventDefault(); } }
+  if(e.key==='ArrowLeft'){ var p=document.querySelector('[data-act="qprev"]')||document.querySelector('[data-act="ptprev"]'); if(p){ p.click(); e.preventDefault(); } }
 });
 
 /* ---------- DEADLINES ---------- */
@@ -859,12 +885,30 @@ function vRevise(){
     + (D.CHEATSHEET[cid] ? homeTile('#/cs/'+cid,'Synthese du cours','formules et definitions',IC.sheet) : '')
     + '</div>';
 }
+function ptRow(id){
+  var it=ptItem(id); if(!it||!it.mcq) return '';
+  var sc=ptScore(id);
+  var st=sc?'<span class="pt-done">dernier '+sc.ok+'/'+sc.total+(sc.n>1?' &middot; meilleur '+sc.best+' &middot; '+sc.n+' essais':'')+'</span>':'<span class="pt-new">nouveau</span>';
+  return '<button class="pt-item" data-go="#/pt/'+id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+it.mcq.length+' QCM &middot; '+(it.duration||45)+' min'+(sc?' &middot; refaire':'')+'</span></span>'+st+'</button>';
+}
+function ptCrHub(){
+  var off=['cr-gen-reviewa','cr-gen-reviewb','cr-gen-mock1','cr-gen-mock2','cr-gen-mock3','cr-gen-mock4','cr-gen-mock5'].filter(function(i){ return ptItem(i); });
+  var oth=['cr-gen-ba3','cr-p1-b1','cr-p1-b2'].filter(function(i){ return ptItem(i); });
+  var done=off.filter(function(i){ return ptScore(i); }).length, all=[].concat(off,oth,['cr-gen-rnd']), n=0, s=0, g=ptScore('cr-gen-rnd');
+  all.forEach(function(i){ var sc=ptScore(i); if(sc){ n++; s+=sc.ok/sc.total; } });
+  return '<div class="card exhero"><div class="exh-e">CORPORATE REPORTING &middot; PARTIE A</div><div class="exh-t">QCM de l&#39;examen, sessions 1 a 15</div>'
+    + '<div class="exh-s">Format officiel, 18 QCM, 45 minutes, pas de points negatifs'+(n?' &middot; moyenne de tes blancs '+Math.round(s/n*100)+'%':'')+'</div>'+(g?'<div class="exh-s">Blancs generes : dernier '+g.ok+'/'+g.total+' &middot; meilleur '+g.best+' &middot; '+g.n+' essai'+(g.n>1?'s':'')+'</div>':'')
+    + '<div class="exh-b" style="margin-top:14px"><button type="button" class="cta pri" data-act="ptgen" data-k="std">Nouveau blanc, 18 QCM</button><button type="button" class="cta" data-act="ptgen" data-k="weak">Blanc sur mes points faibles</button></div></div>'
+    + '<div class="card pt-exam" style="margin-top:14px"><div class="pt-exam-h"><div class="pt-exam-t"><b>QCM officiels du cours</b><span>'+done+' sur '+off.length+' faits &middot; refais-les autant que tu veux, le dernier et le meilleur score sont gardes</span></div></div><div class="pt-items">'+off.map(ptRow).join('')+'</div></div>'
+    + '<div class="card pt-exam" style="margin-top:14px"><div class="pt-exam-h"><div class="pt-exam-t"><b>Blancs au format examen</b><span>Ecrits pour t&#39;entrainer, calculs et principes</span></div></div><div class="pt-items">'+oth.map(ptRow).join('')+'</div></div>';
+}
 function vExams(){
   var up=allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null && n>=0; }).slice(0,6);
-  return '<div class="page-h">Examens</div><div class="page-sub">Dates, partiels blancs et notes.</div>'
+  return '<div class="page-h">Examens</div><div class="page-sub">Entraine-toi sur le format officiel, puis dates et notes.</div>'
+    + ptCrHub() + '<div style="height:18px"></div>'
     + '<div class="card" style="margin-bottom:18px"><h2>Prochaines dates <button class="tag" data-go="#/dl">Tout voir</button></h2>'+(up.length?up.map(dlRow).join(''):'<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>')+'</div>'
     + '<div class="hmgrid">'
-    + homeTile('#/pt','Partiels et mocks blancs','5 mocks officiels CR, review session, blancs A et B',IC.pdf)
+    + homeTile('#/pt','Tous les partiels','FM, DA, Partie B CR, must know et programme de revision',IC.pdf)
     + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
     + '</div>';
 }
@@ -1695,7 +1739,9 @@ document.addEventListener('click', function(e){
     if(act==='ptnext'){ if(ptb&&ptb.idx<ptTotal()-1){ptb.idx++;render();} return; }
     if(act==='ptprev'){ if(ptb&&ptb.idx>0){ptb.idx--;render();} return; }
     if(act==='ptfinish'){ ptFinish(); return; }
-    if(act==='ptretry'){ ptStart(ptb.itemId); return; }
+    if(act==='ptretry'){ if(ptb&&ptb.gen){ ptb={itemId:ptb.itemId,item:ptb.item,idx:0,phase:'run',ans:{},texts:{},t0:Date.now(),gen:ptb.gen}; render(); } else ptStart(ptb.itemId); return; }
+    if(act==='ptwrong'){ ptRetryWrong(); return; }
+    if(act==='ptgen'){ ptStartGen(a.getAttribute('data-k')); return; }
     if(act==='dladd'){
       var lbl = ($('#dlLabel')||{}).value, dt = ($('#dlDate')||{}).value, crs = ($('#dlCourse')||{}).value;
       if(lbl && dt){ var id = 'c'+Date.now(); store.dlCustom[id] = {course:crs, label:lbl, date:dt, kind:'perso'}; save(); render(); }
