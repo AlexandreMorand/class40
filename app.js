@@ -244,8 +244,8 @@ function ptShuf(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor
 /* Blanc genere: 18 QCM niveau Difficile ou Expert, 2/3 de calculs, sessions 1 a 14 melangees. kind 'weak' = priorite a ce que tu as rate ou pas encore vu */
 function ptGenPool(){
   var out=[], L=(D.QCM_LEVELS||{}).cr||{}, m=bestByQuestion();
-  for(var s=1;s<=14;s++){ (L[String(s)]||[]).forEach(function(q){ if(q.level>=2) out.push(q); }); }
-  return out.map(function(q){ var b=m[questionProgressKey('cr',q)]; return {q:q, num:/\d[\d,.]*\d/.test(q.question), st:b?(b.correct?1:3):2}; });
+  for(var s=1;s<=14;s++){ (L[String(s)]||[]).forEach(function(q){ if(q.level>=2) out.push({q:q,s:s}); }); }
+  return out.map(function(o){ var q=o.q, b=m[questionProgressKey('cr',q)]; return {q:q, s:o.s, num:/\d[\d,.]*\d/.test(q.question), st:b?(b.correct?1:3):2}; });
 }
 function ptGenBlanc(kind){
   var pool=ptGenPool(); if(pool.length<20) return null;
@@ -253,14 +253,14 @@ function ptGenBlanc(kind){
   pool.forEach(function(x){ x.sc=Math.random()+(seen[x.q.id]?0:1)+(kind==='weak'?x.st:0); });
   pool.sort(function(a,b){ return b.sc-a.sc; });
   var used={}, picks=[];
-  function take(num,n){ var c=0, cnt={}; for(var pass=0;pass<2&&c<n;pass++){ for(var i=0;i<pool.length&&c<n;i++){ var x=pool[i]; if(x.num!==num||x.used) continue; var s=String(x.q.session); if(pass===0&&(cnt[s]||0)>=2) continue; x.used=true; cnt[s]=(cnt[s]||0)+1; picks.push(x.q); c++; } } }
+  function take(num,n){ var c=0, cnt={}; for(var pass=0;pass<2&&c<n;pass++){ for(var i=0;i<pool.length&&c<n;i++){ var x=pool[i]; if(x.num!==num||x.used) continue; var s=String(x.s); if(pass===0&&(cnt[s]||0)>=2) continue; x.used=true; cnt[s]=(cnt[s]||0)+1; picks.push(x); c++; } } }
   take(true,12); take(false,6);
   picks=ptShuf(picks).slice(0,18);
-  picks.forEach(function(q){ seen[q.id]=1; }); try{ localStorage.setItem('c40-pt-genseen', JSON.stringify(seen)); }catch(e){}
+  picks.forEach(function(x){ seen[x.q.id]=1; }); try{ localStorage.setItem('c40-pt-genseen', JSON.stringify(seen)); }catch(e){}
   return {id:'cr-gen-rnd', exam:'cr-gen', type:'blanc', title:kind==='weak'?'Blanc sur mes points faibles':'Nouveau blanc genere', duration:45, revision:1,
     intro:'Dix-huit QCM tires de ta banque, niveau Difficile ou Expert, environ deux tiers de calculs, sessions 1 a 14 melangees. Chaque blanc est different.'+(kind==='weak'?' Les questions que tu as ratees passent en premier.':''),
     formatNote:'18 QCM, une seule bonne reponse, pas de points negatifs', materialNote:'Livre et slides autorises sur l\'examen reel · calculatrice · corrige detaille a la fin',
-    mcq:picks.map(function(q){ return {session:'Session '+q.session, q:q.question, choices:q.choices, correct:q.correct_index, expl:q.explanation||''}; }), open:[]};
+    mcq:picks.map(function(x){ var q=x.q; return {session:'Session '+x.s, q:q.question, choices:q.choices, correct:q.correct_index, expl:q.explanation||''}; }), open:[]};
 }
 function ptStartGen(kind){ var it=ptGenBlanc(kind); if(!it){ alert('Les questions ne sont pas encore chargees, reessaie dans une seconde.'); return; } ptb={itemId:it.id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), gen:kind}; location.hash='#/pt/'+it.id; render(); }
 function ptRetryWrong(){ if(!ptb) return; var bad=ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]!==q.correct; }); if(!bad.length) return; var it={}; for(var k in ptb.item) it[k]=ptb.item[k]; it.title=ptb.item.title+' · mes erreurs'; it.mcq=bad; it.duration=Math.max(5,Math.round(bad.length*2.5)); ptb={itemId:ptb.itemId, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), noSave:true}; render(); }
@@ -357,7 +357,7 @@ function vPtBlanc(it){
     var opts = q.choices.map(function(ch, j){
       return '<button class="opt'+(j===mine?' sel':'')+'" data-act="ptans" data-i="'+j+'"><span class="k">'+'ABCD'[j]+'</span><span>'+esc(ch)+'</span></button>';
     }).join('');
-    return head + '<div class="qcard"><div class="qmeta"><span>QCM '+(ptb.idx+1)+' &middot; '+esc(q.session)+'</span></div><div class="qq">'+esc(q.q)+'</div>'+opts+foot+'</div>';
+    return head + '<div class="qcard"><div class="qmeta"><span>QCM '+(ptb.idx+1)+'</span></div><div class="qq">'+esc(q.q)+'</div>'+opts+foot+'</div>';
   }
   var oi = ptb.idx - it.mcq.length, o = it.open[oi];
   return head + '<div class="qcard"><div class="qmeta"><span>'+esc(o.title)+'</span></div>'
@@ -1738,7 +1738,7 @@ document.addEventListener('click', function(e){
     if(act==='ptans'){ ptAnswer(parseInt(a.getAttribute('data-i'),10)); return; }
     if(act==='ptnext'){ if(ptb&&ptb.idx<ptTotal()-1){ptb.idx++;render();} return; }
     if(act==='ptprev'){ if(ptb&&ptb.idx>0){ptb.idx--;render();} return; }
-    if(act==='ptfinish'){ ptFinish(); return; }
+    if(act==='ptfinish'){ ptCapture(); var un=ptb?ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]===undefined; }).length:0; if(un&&!confirm('Il te reste '+un+' question'+(un>1?'s':'')+' sans reponse. Terminer quand meme ?')) return; ptFinish(); return; }
     if(act==='ptretry'){ if(ptb&&ptb.gen){ ptb={itemId:ptb.itemId,item:ptb.item,idx:0,phase:'run',ans:{},texts:{},t0:Date.now(),gen:ptb.gen}; render(); } else ptStart(ptb.itemId); return; }
     if(act==='ptwrong'){ ptRetryWrong(); return; }
     if(act==='ptgen'){ ptStartGen(a.getAttribute('data-k')); return; }
