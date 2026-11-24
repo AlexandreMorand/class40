@@ -133,7 +133,7 @@ a.dl:hover{background:#f6f7fd}
 .opt.wrong .k{background:var(--bad);color:#fff}
 .opt.dim{opacity:.55;pointer-events:none}
 .expl{background:#f6f7fd;border-left:3px solid var(--pri);border-radius:8px;padding:12px 14px;font-size:12.5px;color:#3c4465;margin:6px 0 14px;line-height:1.5}
-.qfoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.qfoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;position:sticky;bottom:0;z-index:5;padding:10px 0 6px;background:linear-gradient(to top,var(--surface) 72%,rgba(255,255,255,0))}
 .score-big{font-size:44px;font-weight:800;letter-spacing:-.03em}
 .flash-wrap{max-width:560px;margin:0 auto;text-align:center}
 .flashcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:44px 30px;min-height:230px;display:grid;place-items:center;cursor:pointer;transition:.15s;user-select:none;width:100%;border:none;text-align:center}
@@ -166,8 +166,10 @@ footer{margin-top:26px;text-align:center;color:var(--muted);font-size:11px}
 .tabbar .nav{flex:1;flex-direction:column;gap:3px;font-size:10px;padding:6px 2px;width:auto;align-items:center}
 .tabbar .nav svg{width:18px;height:18px}
 @media(max-width:900px){
+  .courses{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.courses .pill{flex:none;white-space:nowrap}
   .rail{display:none}
   .tabbar{display:flex}
+  .qfoot{bottom:calc(58px + env(safe-area-inset-bottom))}
   .grid{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(2,1fr)}
   .tiles{grid-template-columns:1fr}
@@ -270,6 +272,10 @@ footer{margin-top:26px;text-align:center;color:var(--muted);font-size:11px}
 .exdim{opacity:.55}.exdim:hover{opacity:1}
 .exwr{color:#b91c1c;font-weight:800}
 .exdet{margin-top:22px}.exdet summary{cursor:pointer;font-weight:800;font-size:13.5px;padding:10px 0;color:var(--muted)}
+.exhero{margin:16px 0 0;background:linear-gradient(135deg,#4f46e5,#6366f1);color:#fff;border:0}
+.exhero .exh-e{font-size:11px;font-weight:800;letter-spacing:.08em;opacity:.8}.exhero .exh-t{font-size:19px;font-weight:800;margin-top:4px}.exhero .exh-s{font-size:13px;opacity:.9;margin-top:3px}
+.exhero .bar{background:rgba(255,255,255,.25);margin:12px 0}.exhero .bar i{background:#fff}
+.exh-b{display:flex;gap:8px;flex-wrap:wrap}.exh-b .cta{flex:1 1 auto;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.4)}.exh-b .cta.pri{background:#fff;color:#4f46e5;border-color:#fff}
 .mysess{margin:16px 0 18px;border:1.5px solid var(--pri);box-shadow:0 8px 22px rgba(79,70,229,.12)}
 .mys-h{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
 .mys-e{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--pri)}.mys-t{font-size:24px;font-weight:900;letter-spacing:-.02em}.mys-s{font-size:13px;color:var(--muted);font-weight:600;max-width:520px}
@@ -331,8 +337,9 @@ window.addEventListener('error', function(e){
   }
 }, true);
 </script>
-<script src="data.js?v=lot170-20261118"></script>
-<script src="app.js?v=lot170-20261118"></script>
+<script src="data.js?v=lot171-20261118"></script>
+<script src="levels.js?v=lot171-20261118" async></script>
+<script src="app.js?v=lot171-20261118"></script>
 </body>
 </html>
 <style>

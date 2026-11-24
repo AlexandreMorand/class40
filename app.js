@@ -475,6 +475,15 @@ function exSeqNext(c){ var ss=store.exSess; if(!ss) return null; var L=exChapter
 function exSessions(){ var E=exData(), m={}; E.chapters.forEach(function(c){ c.s.forEach(function(k){ m[k]=1; }); }); return Object.keys(m).map(Number).sort(function(a,b){return a-b;}); }
 function exSessProg(k){ var d=0,t=0,ok=0; exChaptersForSession(k).forEach(function(c){ var p=exProgress(c); d+=p.done; t+=p.total; ok+=p.ok; }); return {done:d,total:t,ok:ok}; }
 function exFirstOpen(c){ for(var j=0;j<c.items.length;j++){ if(!exStatus(c.items[j])) return j; } return c.items.length; }
+function qExp(e){
+  e=String(e); if(e.indexOf('\n')<0) return esc(e);
+  return '<div class="exw">'+e.split('\n').map(function(l){
+    var m=l.match(/^(Step \d+\.|In plain words\.|Principle(?: \([^)]*\))?\.|Reading\.|Check[^:.]*[:.]|Evidence\.|Reasoning\.|Also useful:|Note:)\s*(.*)$/);
+    if(m) return '<div class="exws"><b>'+esc(m[1])+'</b> '+esc(m[2])+'</div>';
+    if(/^Wrong /.test(l)) return '<div class="exws exbad">'+esc(l)+'</div>';
+    return '<div class="exws">'+esc(l)+'</div>';
+  }).join('')+'</div>';
+}
 function exExp(e){
   var L=String(e).split('\n'), h='<span class="exlead">'+esc(L[0])+'</span>';
   if(L.length>1) h+='<div class="exw">'+L.slice(1).map(function(l){
@@ -591,7 +600,7 @@ function mySessionCard(cid){
   steps+= fu ? '<a class="mst'+(seenF?' ok':'')+'" href="'+esc(fu)+'" target="_blank" rel="noopener" data-act="fiche" data-cid="'+cid+'" data-n="'+key+'"><span class="mst-n">'+(seenF?'&#10003;':1)+'</span><span class="mst-t"><b>Lire la fiche</b><span>'+(seenF?'deja lue':'resume de la session, PDF')+'</span></span><span class="mst-g">Ouvrir &rarr;</span></a>' : '';
   steps+= nbC ? step(2,nbC&&kn>=nbC,'Flashcards',nbC+' cartes &middot; '+kn+' connues','data-go="#/f/'+cid+'/'+key+'"','Reviser') : '';
   steps+= sp.total ? step(3,sp.pct>=100,'QCM de la session',sp.done+'/'+sp.total+' questions &middot; '+sp.acc+'% de reussite','data-go="#/s/'+cid+'/'+key+'"',sp.done?'Reprendre':'Commencer') : '';
-  steps+= exT ? step(4,exD>=exT,'Exercices du livre',exD+'/'+exT+' faits'+(exW?' &middot; <span class="exwr">'+exW+' rate'+(exW>1?'s':'')+'</span>':''),'data-act="exsess" data-s="'+key+'"',exD?'Continuer':'Commencer') : '';
+  steps+= (exT && cid!=='cr') ? step(4,exD>=exT,'Exercices du livre',exD+'/'+exT+' faits'+(exW?' &middot; <span class="exwr">'+exW+' rate'+(exW>1?'s':'')+'</span>':''),'data-act="exsess" data-s="'+key+'"',exD?'Continuer':'Commencer') : '';
   steps+= step(5,!mp,'Mes fautes',mp?mp+' question'+(mp>1?'s':'')+' a revoir (recall de memoire)':'aucune faute en attente',mp?'data-act="rcstart" data-cid="'+cid+'"':'data-go="#/rev"',mp?'Active recall':'Reviser');
   return '<div class="card mysess"><div class="mys-h"><div><div class="mys-e">MA SESSION &middot; '+esc(c.name)+'</div><div class="mys-t">Session '+cur.n+'</div><div class="mys-s">'+esc(cur.title)+'</div></div>'
     + '<div class="mys-sel"><label>Je suis en</label><select class="exsel" id="mySess" data-cid="'+cid+'">'+seenOpts+'</select></div></div>'
@@ -914,12 +923,25 @@ function dlRow(d){
   var chip = n==null ? '' : (n===0 ? "aujourd'hui" : (n<0 ? 'passee' : 'J-'+n));
   return '<a class="dl'+soon+'" data-go="#/c/'+(d.course||'cr')+'"><span class="when"><b>'+w.b+'</b><span>'+w.s+'</span></span><span class="tx"><b>'+esc(d.label)+'</b><span>'+esc(courseOf(d.course||'cr').name)+(d.kind?' &middot; '+esc(d.kind):'')+'</span></span><span class="chip2">'+chip+'</span></a>';
 }
+function exHero(){
+  var E=exData(); if(!E) return '';
+  var tt=exTotals(), sc=exScore(), seen=exSeenSession(), L=exChaptersForSession(seen.n), d=0, t=0;
+  L.forEach(function(ch){ var p=exProgress(ch); d+=p.done; t+=p.total; });
+  var mist=exMistakes(), pct=tt.total?Math.round(tt.done/tt.total*100):0;
+  return '<div class="card exhero"><div class="exh-h"><div><div class="exh-e">EXERCICES DU LIVRE</div><div class="exh-t">'+tt.done+' sur '+tt.total+' faits &middot; '+(sc.a?Math.round(sc.ok/sc.a*100)+'% de reussite':'pas encore commence')+'</div>'
+    + (t?'<div class="exh-s">Session '+seen.n+' : '+d+'/'+t+' exercices faits</div>':'')+'</div></div>'
+    + '<div class="bar"><i class="'+(pct===100?'full':'')+'" data-w="'+pct+'"></i></div>'
+    + '<div class="exh-b">'+(t?'<button type="button" class="cta pri" data-act="exsess" data-s="'+seen.n+'">'+(d?'Continuer la session '+seen.n:'Commencer la session '+seen.n)+' &rarr;</button>':'')
+    + (mist.length?'<button type="button" class="cta" data-go="#/ex/'+mist[0].c.n+'/'+(mist[0].pos+1)+'">Refaire mes '+mist.length+' erreur'+(mist.length>1?'s':'')+'</button>':'')
+    + '<button type="button" class="cta" data-go="#/ex">Tous les chapitres</button></div></div>';
+}
 function vCourse(cid){
   var c = courseOf(cid), p = courseProgress(cid), seen=seenSession(cid), n=seen.n;
   var cur=function(s){ return s.n<=n; }, nxt=function(s){ return s.n>n; };
   var follow=chapterRows(cid, 0, cur, false), later=chapterRows(cid, 0, nxt, true);
   return courseChips(cid)
   + '<div class="page-h">'+esc(c.name)+'</div><div class="page-sub">'+esc(c.sub)+' &middot; '+p.done+'/'+p.total+' questions traitees ('+p.pct+'%)</div>'
+  + (cid==='cr' ? exHero() : '')
   + mySessionCard(cid)
   + (cid==='fm' ? '<div class="card" style="margin-bottom:18px"><h2>Mock exam FM</h2><div class="pt-items"><button class="pt-item" data-go="#/pt/fm-p1-b2"><span class="pt-item-t"><b>Mock FM #2</b><span>4 QCM à 3 options + 2 ouvertes · 45 min</span></span><span class="pt-new">Commencer</span></button><button class="pt-item" data-go="#/pt/fm-p1-official"><span class="pt-item-t"><b>Mock officiel FM et corrigé</b><span>Blackboard · accès Bocconi requis</span></span><span class="pt-new">Ouvrir</span></button></div></div>' : '')
   + '<div class="grid"><section>'
@@ -1017,7 +1039,7 @@ function vQuiz(cid, n, src){
     }
     return '<button class="'+cls+'" data-act="ans" data-i="'+i+'"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></button>';
   }).join('');
-  var expl = (ans && q.explanation) ? '<div class="expl"><b>Pourquoi :</b> '+esc(q.explanation)+'</div>' : '';
+  var expl = (ans && q.explanation) ? '<div class="expl"><b>Pourquoi :</b> '+qExp(q.explanation)+'</div>' : '';
   var foot = ans
     ? '<button class="cta line" data-act="qprev">&larr; Precedente</button><button class="cta pri" data-act="qnext">'+(quiz.idx===total-1?'Voir le score':'Suivante &rarr;')+'</button>'
     : '<span style="font-size:11.5px;color:var(--muted);font-weight:600">Choisis une reponse</span><button class="cta line" data-act="qskip">Passer &rarr;</button>';
@@ -1176,7 +1198,7 @@ function vQPlay(){
     }
     return '<button class="'+cls+'" data-act="ans" data-i="'+i+'"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></button>';
   }).join('');
-  var expl = (ans && q.explanation) ? '<div class="expl"><b>Pourquoi :</b> '+esc(q.explanation)+'</div>' : '';
+  var expl = (ans && q.explanation) ? '<div class="expl"><b>Pourquoi :</b> '+qExp(q.explanation)+'</div>' : '';
   var foot = ans
     ? '<button class="cta line" data-act="qprev">&larr; Precedente</button><button class="cta pri" data-act="qnext">'+(quiz.idx===total-1?'Voir le score':'Suivante &rarr;')+'</button>'
     : '<span style="font-size:11.5px;color:var(--muted);font-weight:600">Choisis une reponse</span><button class="cta line" data-act="qskip">Passer &rarr;</button>';
@@ -1398,7 +1420,7 @@ function vRecall(cid){
   } else {
     var opts=q.choices.map(function(ch,i){ return '<div class="opt '+(i===q.correct_index?'right':'dim')+'" style="cursor:default"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></div>'; }).join('');
     body='<div class="qq">'+esc(q.question)+'</div>'+opts
-      + (q.explanation ? '<div class="expl"><b>Pourquoi :</b> '+esc(q.explanation)+'</div>' : '')
+      + (q.explanation ? '<div class="expl"><b>Pourquoi :</b> '+qExp(q.explanation)+'</div>' : '')
       + (fu ? '<p style="font-size:12.5px;margin:10px 0 0"><a href="'+esc(fu)+'" target="_blank" rel="noopener">Relire la fiche de la session &rarr;</a></p>' : '')
       + '<div class="qfoot"><button class="cta line" data-act="rcmiss">Je ne l&#39;avais pas</button><button class="cta pri" data-act="rcknow">Je l&#39;avais</button></div>';
   }
@@ -1688,6 +1710,9 @@ document.addEventListener('keydown', function(e){
   if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openSearch(); }
   if(e.key==='Escape') closeSearch();
 });
+
+/* levels.js (QCM par niveau) charge en asynchrone: on redessine quand il arrive */
+window.addEventListener('c40levels',function(){ try{ render(); }catch(e){} });
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator){

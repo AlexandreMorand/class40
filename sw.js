@@ -1,6 +1,6 @@
-const V='lot170-20261118';
+const V='lot171-20261118';
 const CACHE='c40-app-'+V;
-const CORE=['./','index.html','app.js?v='+V,'data.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+const CORE=['./','index.html','app.js?v='+V,'data.js?v='+V,'levels.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
     await Promise.all(CORE.map(async path=>{
