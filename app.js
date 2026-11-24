@@ -662,6 +662,18 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowLeft'){ var p=document.getElementById('exprev'); if(p){ p.click(); e.preventDefault(); } }
 });
 
+
+/* ---------- QCM : raccourcis clavier (A-D ou 1-4 pour repondre, Entree ou fleche droite pour continuer) ---------- */
+document.addEventListener('keydown',function(e){
+  if(e.metaKey||e.ctrlKey||e.altKey||/^#\/ex\//.test(location.hash)) return;
+  var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA'||document.querySelector('.omni')) return;
+  var opts=document.querySelectorAll('button[data-act="ans"]'); if(!opts.length) return;
+  var k=e.key.toLowerCase(), idx='abcd'.indexOf(k); if(idx<0) idx=['1','2','3','4'].indexOf(k);
+  if(idx>=0 && k.length===1){ if(opts[idx]){ opts[idx].click(); e.preventDefault(); } return; }
+  if(e.key==='Enter'||e.key==='ArrowRight'){ var n=document.querySelector('[data-act="qnext"]')||document.querySelector('[data-act="qskip"]'); if(n){ n.click(); e.preventDefault(); } }
+  if(e.key==='ArrowLeft'){ var p=document.querySelector('[data-act="qprev"]'); if(p){ p.click(); e.preventDefault(); } }
+});
+
 /* ---------- DEADLINES ---------- */
 function allDeadlines(){
   var out = [];
@@ -785,7 +797,7 @@ function shell(content, r){
     + '<div class="streak">Serie en cours<b>'+st+' jour'+(st>1?'s':'')+'</b>Reponds a 10 questions pour la garder.</div>'
     + '</aside>'
     + '<main class="main"><div class="topbar">'
-    + '<button class="search" data-act="search">'+IC.search+'<span>Rechercher une session, un theme, une carte...</span><kbd>Cmd K</kbd></button>'
+    + '<button class="search" data-act="search">'+IC.search+'<span>Rechercher</span><kbd>Cmd K</kbd></button>'
     + '<span class="netdot" id="netdot" title="connexion"></span>'
     + '<span class="avatar">A</span></div>'
     + '<div class="view">'+content+'</div>'

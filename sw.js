@@ -1,5 +1,6 @@
-const CACHE='c40-app-lot169-20261118';
-const CORE=['./','index.html','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+const V='lot170-20261118';
+const CACHE='c40-app-'+V;
+const CORE=['./','index.html','app.js?v='+V,'data.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(async c=>{
     await Promise.all(CORE.map(async path=>{
@@ -27,7 +28,9 @@ self.addEventListener('fetch',e=>{
   // them: a cached fiche can silently go stale and the PDF viewer issues range
   // requests that must not be answered from a cache.
   if(/\.pdf$/i.test(url.pathname)) return;
-  const fresh=req.mode==='navigate'||/\/(index\.html|app\.js|data\.js|sw\.js)$/.test(url.pathname);
+  const versioned=url.searchParams.has('v');
+  // app.js et data.js versionnes (?v=) sont immuables: cache d'abord, plus de retelechargement de 1 Mo a chaque ouverture
+  const fresh=req.mode==='navigate'||/\/(index\.html|sw\.js)$/.test(url.pathname)||(!versioned&&/\/(app\.js|data\.js)$/.test(url.pathname));
   if(fresh){
     e.respondWith((async()=>{
       try {
