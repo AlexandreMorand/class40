@@ -1064,6 +1064,7 @@ function vQuiz(cid, n, src){
     var bdir=bank(cid,n), hasSupp=bdir.some(function(q){return q.supplement;});
     if(setsOf(cid,n).length>1 || hasSupp || bdir.length>15){ location.replace('#/s/'+cid+'/'+n); return ''; }
   }
+  if(isLevel && !levelsReady()) return '<button class="back" data-go="#/s/'+cid+'/'+n+'">&larr; Retour</button><div class="page-h">Chargement des questions...</div><div class="card"><p style="font-size:13px;color:var(--muted)">Une seconde, les QCM se chargent.</p></div>';
   if(!quiz || quiz.cid!==cid || String(quiz.n)!==String(n) || (quiz.src||null)!==src) startQuiz(cid,n,src);
   var c = courseOf(cid);
   var backHash = (n && n!=='all') ? '#/s/'+cid+'/'+n : '#/c/'+cid;
@@ -1758,7 +1759,8 @@ document.addEventListener('keydown', function(e){
 });
 
 /* levels.js (QCM par niveau) charge en asynchrone: on redessine quand il arrive */
-window.addEventListener('c40levels',function(){ try{ render(); }catch(e){} });
+function levelsReady(){ return !!(D.QCM_LEVELS && Object.keys(D.QCM_LEVELS).length); }
+window.addEventListener('c40levels',function(){ try{ if(quiz && !quiz.bank.length) quiz=null; render(); }catch(e){} });
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator){
