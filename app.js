@@ -488,6 +488,7 @@ function exExp(e){
 function exMethHtml(c,i,q){
   var M=D.EX_METHODS; if(!M || i.k!=='calculation') return '';
   if(q && !/\d[\d,.]*\d/.test(q.s||'')) return '';
+  if(q && /In plain words\./.test(q.e||'')) return '';
   var keys=(M.byEx&&M.byEx[i.n])||(M.byChapter&&M.byChapter[String(c.n)])||[];
   var cards=keys.map(function(k){ return M.cards[k]; }).filter(Boolean);
   if(!cards.length) return '';
