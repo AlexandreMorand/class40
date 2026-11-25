@@ -344,6 +344,25 @@ footer{margin-top:26px;text-align:center;color:var(--muted);font-size:11px}
 .main.focus .page-h{font-size:30px}
 }
 @media(max-width:900px){.main.focus .qq{font-size:17px}.main.focus .opt{font-size:14.5px}}
+/* page Examens */
+.exm-cd{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:6px 0 14px}
+.exm-cd-i{display:flex;flex-direction:column;gap:2px;align-items:flex-start;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;text-align:left;font-family:inherit;transition:.12s}
+.exm-cd-i.on{border-color:var(--pri);box-shadow:0 6px 18px rgba(79,70,229,.14);background:var(--pri-soft)}
+.exm-cd-c{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--muted)}
+.exm-cd-j{font-size:26px;line-height:1.1;font-weight:800;color:var(--text,#1a1d3a)}
+.exm-cd-d{font-size:12px;font-weight:700;color:var(--muted)}
+.exm-cd-p{font-size:11.5px;font-weight:700;color:var(--pri);margin-top:4px}
+.exm-hero-st{display:flex;gap:26px;margin-top:14px}.exm-hero-st b{display:block;font-size:24px;font-weight:800}.exm-hero-st span{font-size:12px;opacity:.85}
+.exm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.exm-tile{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;font-family:inherit;transition:.12s}
+.exm-tile:hover{border-color:var(--pri);transform:translateY(-1px)}
+.exm-tile b{font-size:14.5px}.exm-tile span{font-size:12.5px;color:var(--muted);line-height:1.45}.exm-tile i{font-style:normal;font-size:12px;font-weight:800;color:var(--pri);margin-top:6px}
+.exm-bars{display:flex;align-items:flex-end;gap:7px;height:110px;margin:4px 0 8px}
+.exm-bars i{position:relative;flex:1;max-width:46px;border-radius:7px 7px 0 0;background:#c7c9f2;min-height:8px}
+.exm-bars i.ok{background:var(--ok,#10b981)}.exm-bars i.ko{background:#f59e0b}
+.exm-bars i em{position:absolute;top:-17px;left:0;right:0;text-align:center;font-style:normal;font-size:10.5px;font-weight:800;color:var(--muted)}
+.exm-note{font-size:12px;color:var(--muted)}
+@media(max-width:700px){.exm-cd{grid-template-columns:repeat(2,1fr)}.exm-hero-st{gap:16px}}
 </style>
 </head>
 <body>
@@ -356,9 +375,9 @@ window.addEventListener('error', function(e){
   }
 }, true);
 </script>
-<script src="data.js?v=lot175-20261118"></script>
-<script src="levels.js?v=lot175-20261118" async></script>
-<script src="app.js?v=lot175-20261118"></script>
+<script src="data.js?v=lot176-20261125"></script>
+<script src="levels.js?v=lot176-20261125" async></script>
+<script src="app.js?v=lot176-20261125"></script>
 </body>
 </html>
 <style>

@@ -241,28 +241,63 @@ function ptSaveScore(id, ok, total){ var s=ptScores(), o=s[id]||{}; s[id]={ok:ok
 function ptTotal(){ return ptb ? ptb.item.mcq.length + ptb.item.open.length : 0; }
 function ptStart(id){ var it=ptItem(id); if(!it||it.type!=='blanc') return; ptb={itemId:id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now()}; render(); }
 function ptShuf(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
-/* Blanc genere: 18 QCM niveau Difficile ou Expert, 2/3 de calculs, sessions 1 a 14 melangees. kind 'weak' = priorite a ce que tu as rate ou pas encore vu */
-function ptGenPool(){
-  var out=[], L=(D.QCM_LEVELS||{}).cr||{}, m=bestByQuestion();
-  for(var s=1;s<=14;s++){ (L[String(s)]||[]).forEach(function(q){ if(q.level>=2) out.push({q:q,s:s}); }); }
-  return out.map(function(o){ var q=o.q, b=m[questionProgressKey('cr',q)]; return {q:q, s:o.s, num:/\d[\d,.]*\d/.test(q.question), st:b?(b.correct?1:3):2}; });
+/* ---- Blancs generes pour tous les cours ---- */
+var PT_BLOCKS={b1:{t:'Cadre et etats financiers',s:[1,2,3,4]},b2:{t:'Instruments financiers',s:[5,6,7,8]},b3:{t:'Actifs, depreciation, provisions',s:[9,10,11,12,13,14]}};
+function ptGenSpec(c,k){
+  var S={
+    cr:{n:18,num:.67,min:45,title:'Blanc Partie A',sess:[1,2,3,4,5,6,7,8,9,10,11,12,13,14]},
+    da:{n:15,num:.5,min:45,title:'Blanc Data Analysis',sess:null},
+    fm:{n:15,num:.5,min:45,title:'Blanc Financial Management',sess:null},
+    cg:{n:15,num:0,min:30,title:'Blanc Corporate Governance',sess:null}}[c];
+  if(!S) return null;
+  var sp={cid:c,n:S.n,num:S.num,min:S.min,title:S.title,sess:S.sess,weak:false,id:c==='cr'&&(k==='std'||k==='weak')?'cr-gen-rnd':c+'-gen-'+k};
+  if(k==='weak'){ sp.weak=true; sp.title='Blanc sur mes points faibles'; }
+  else if(k==='std'&&c!=='cr'){ sp.title=S.title; }
+  if(PT_BLOCKS[k]&&c==='cr'){ sp.sess=PT_BLOCKS[k].s; sp.n=12; sp.min=30; sp.title='Blanc par bloc, '+PT_BLOCKS[k].t; sp.num=.5; }
+  if(k==='data'&&c==='da'){ sp.data=true; sp.n=12; sp.min=30; sp.num=1; sp.title='Blanc datasets R'; }
+  return sp;
 }
-function ptGenBlanc(kind){
-  var pool=ptGenPool(); if(pool.length<20) return null;
+function ptGenPool(sp){
+  var out=[], m=bestByQuestion();
+  if(sp.data){ ((D.QCM_DATA||{}).da||[]).forEach(function(q){ out.push({q:q,s:q.session,st:2,num:true}); }); return out; }
+  var L=(D.QCM_LEVELS||{})[sp.cid]||{}, keys=sp.sess?sp.sess.map(String):Object.keys(L);
+  keys.forEach(function(s){ (L[s]||[]).forEach(function(q){ if(q.level>=2){ var b=m[questionProgressKey(sp.cid,q)]; out.push({q:q,s:s,st:b?(b.correct?1:3):2,num:/\d[\d,.]*\d/.test(q.question)}); } }); });
+  return out;
+}
+function ptGenBlanc(c,k){
+  var sp=ptGenSpec(c,k); if(!sp) return null;
+  var pool=ptGenPool(sp); if(pool.length<sp.n+2) return null;
   var seen={}; try{ seen=JSON.parse(localStorage.getItem('c40-pt-genseen')||'{}'); }catch(e){}
-  pool.forEach(function(x){ x.sc=Math.random()+(seen[x.q.id]?0:1)+(kind==='weak'?x.st:0); });
+  pool.forEach(function(x){ x.sc=Math.random()+(seen[x.q.id]?0:1)+(sp.weak?x.st:0); });
   pool.sort(function(a,b){ return b.sc-a.sc; });
-  var used={}, picks=[];
-  function take(num,n){ var c=0, cnt={}; for(var pass=0;pass<2&&c<n;pass++){ for(var i=0;i<pool.length&&c<n;i++){ var x=pool[i]; if(x.num!==num||x.used) continue; var s=String(x.s); if(pass===0&&(cnt[s]||0)>=2) continue; x.used=true; cnt[s]=(cnt[s]||0)+1; picks.push(x); c++; } } }
-  take(true,12); take(false,6);
-  picks=ptShuf(picks).slice(0,18);
+  var picks=[];
+  function take(num,n){ var cnt=0, per={}; for(var pass=0;pass<2&&cnt<n;pass++){ for(var i=0;i<pool.length&&cnt<n;i++){ var x=pool[i]; if(x.used||x.num!==num) continue; var s=String(x.s); if(pass===0&&(per[s]||0)>=2) continue; x.used=true; per[s]=(per[s]||0)+1; picks.push(x); cnt++; } } }
+  var nn=Math.round(sp.n*sp.num); take(true,nn); take(false,sp.n-picks.length); if(picks.length<sp.n) take(true,sp.n-picks.length);
+  picks=ptShuf(picks).slice(0,sp.n);
   picks.forEach(function(x){ seen[x.q.id]=1; }); try{ localStorage.setItem('c40-pt-genseen', JSON.stringify(seen)); }catch(e){}
-  return {id:'cr-gen-rnd', exam:'cr-gen', type:'blanc', title:kind==='weak'?'Blanc sur mes points faibles':'Nouveau blanc genere', duration:45, revision:1,
-    intro:'Dix-huit QCM tires de ta banque, niveau Difficile ou Expert, environ deux tiers de calculs, sessions 1 a 14 melangees. Chaque blanc est different.'+(kind==='weak'?' Les questions que tu as ratees passent en premier.':''),
-    formatNote:'18 QCM, une seule bonne reponse, pas de points negatifs', materialNote:'Livre et slides autorises sur l\'examen reel · calculatrice · corrige detaille a la fin',
+  return {id:sp.id, exam:c+'-gen', type:'blanc', title:sp.title, duration:sp.min, revision:1,
+    intro:sp.n+' QCM tires de ta banque, niveau Difficile ou Expert'+(sp.num?', environ '+Math.round(sp.num*100)+'% de calculs':'')+'. Chaque blanc est different.'+(sp.weak?' Les questions que tu as ratees passent en premier.':''),
+    formatNote:sp.n+' QCM, une seule bonne reponse, pas de points negatifs', materialNote:'Livre et slides autorises sur l\'examen reel · calculatrice · corrige detaille a la fin',
     mcq:picks.map(function(x){ var q=x.q; return {session:'Session '+x.s, q:q.question, choices:q.choices, correct:q.correct_index, expl:q.explanation||''}; }), open:[]};
 }
-function ptStartGen(kind){ var it=ptGenBlanc(kind); if(!it){ alert('Les questions ne sont pas encore chargees, reessaie dans une seconde.'); return; } ptb={itemId:it.id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), gen:kind}; location.hash='#/pt/'+it.id; render(); }
+/* Partie B de CR: 5 questions ouvertes de calcul, sessions 16 a 31, avec corrige redige */
+function ptGenOpen(){
+  var L=(D.QCM_LEVELS||{}).cr||{}, cand=[];
+  Object.keys(L).forEach(function(s){ if(+s<16) return; var qs=(L[s]||[]).filter(function(q){ return /-calc-/.test(q.id); }); if(qs.length) cand.push({s:s,qs:qs}); });
+  if(cand.length<5) return null;
+  var picks=ptShuf(cand).slice(0,5).map(function(g){ return {s:g.s,q:g.qs[Math.floor(Math.random()*g.qs.length)]}; });
+  var open=picks.map(function(p,i){ var q=p.q, ans=q.choices[q.correct_index];
+    return {title:'Question '+(i+1)+' · session '+p.s, body:q.question+'\n\nShow your calculation step by step and state the accounting treatment.',
+      solution:'**Answer: '+ans+'**\n\n'+String(q.explanation||'').split('\n').filter(function(l){ return !/^Wrong /.test(l); }).join('\n\n')}; });
+  return {id:'cr-gen-open', exam:'cr-gen', type:'blanc', title:'Blanc Partie B genere', duration:60, revision:1,
+    intro:'Cinq questions ouvertes de calcul sur les sessions 16 a 31 (leases, impots differes, revenus, paiements en actions, pensions, consolidation). Redige tes calculs, le corrige detaille arrive a la fin.',
+    formatNote:'5 questions ouvertes, calculs et traitement comptable', materialNote:'Livre et slides autorises sur l\'examen reel · calculatrice', mcq:[], open:open};
+}
+function ptStartGen(kind,c){
+  c=c||'cr'; var it=(kind==='open'&&c==='cr')?ptGenOpen():ptGenBlanc(c,kind);
+  if(!it){ alert('Les questions ne sont pas encore chargees, reessaie dans une seconde.'); return; }
+  ptb={itemId:it.id, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), gen:kind, genC:c}; location.hash='#/pt/'+it.id; render();
+}
 function ptRetryWrong(){ if(!ptb) return; var bad=ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]!==q.correct; }); if(!bad.length) return; var it={}; for(var k in ptb.item) it[k]=ptb.item[k]; it.title=ptb.item.title+' · mes erreurs'; it.mcq=bad; it.duration=Math.max(5,Math.round(bad.length*2.5)); ptb={itemId:ptb.itemId, item:it, idx:0, phase:'run', ans:{}, texts:{}, t0:Date.now(), noSave:true}; render(); }
 function ptFmtT(s){ var n=s<0, a=Math.abs(s), m=Math.floor(a/60), r=a%60; return (n?'+':'')+(m<10?'0':'')+m+':'+(r<10?'0':'')+r; }
 setInterval(function(){ var el=document.getElementById('ptTimer'); if(!el||!ptb||ptb.phase!=='run'||!ptb.t0) return; var left=Math.round((ptb.item.duration||45)*60-(Date.now()-ptb.t0)/1000); el.textContent=ptFmtT(left); el.className='pt-timer'+(left<0?' late':left<300?' low':''); },1000);
@@ -342,7 +377,7 @@ function vPtBlanc(it){
         + '<div class="pt-your"><b>Ta redaction</b>'+(txt ? esc(txt) : '<i>Non redige</i>')+'</div>'
         + '<div class="expl" style="margin-top:12px"><b>Solution detaillee :</b><div class="md" style="margin-top:8px">'+mdLite(o.solution)+'</div></div></div>';
     });
-    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"><button class="cta pri" data-act="ptretry">'+(ptb.gen?'Refaire ces 18 QCM':'Refaire ce partiel blanc')+'</button>'+(ptb.score&&ptb.score.ok<ptb.score.total?'<button class="cta" data-act="ptwrong">Refaire mes '+(ptb.score.total-ptb.score.ok)+' erreur'+(ptb.score.total-ptb.score.ok>1?'s':'')+'</button>':'')+(ptb.gen?'<button class="cta" data-act="ptgen" data-k="'+ptb.gen+'">Nouveau blanc</button>':'')+'<button class="cta line" data-go="#/pt">Retour aux partiels</button></div>';
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"><button class="cta pri" data-act="ptretry">'+(ptb.gen?'Refaire ce blanc':'Refaire ce partiel blanc')+'</button>'+(ptb.score&&ptb.score.ok<ptb.score.total?'<button class="cta" data-act="ptwrong">Refaire mes '+(ptb.score.total-ptb.score.ok)+' erreur'+(ptb.score.total-ptb.score.ok>1?'s':'')+'</button>':'')+(ptb.gen?'<button class="cta" data-act="ptgen" data-c="'+(ptb.genC||'cr')+'" data-k="'+ptb.gen+'">Nouveau blanc</button>':'')+'<button class="cta line" data-go="#/pt">Retour aux partiels</button></div>';
     return h;
   }
   var total = ptTotal(), isMcq = ptb.idx < it.mcq.length;
@@ -885,32 +920,79 @@ function vRevise(){
     + (D.CHEATSHEET[cid] ? homeTile('#/cs/'+cid,'Synthese du cours','formules et definitions',IC.sheet) : '')
     + '</div>';
 }
-function ptRow(id){
-  var it=ptItem(id); if(!it||!it.mcq) return '';
-  var sc=ptScore(id);
-  var st=sc?'<span class="pt-done">dernier '+sc.ok+'/'+sc.total+(sc.n>1?' &middot; meilleur '+sc.best+' &middot; '+sc.n+' essais':'')+'</span>':'<span class="pt-new">nouveau</span>';
-  return '<button class="pt-item" data-go="#/pt/'+id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+it.mcq.length+' QCM &middot; '+(it.duration||45)+' min'+(sc?' &middot; refaire':'')+'</span></span>'+st+'</button>';
+function ptItemsOf(cid){
+  var seen={}, out=[];
+  ptExams().filter(function(x){ return x.course===cid; }).forEach(function(x){ (x.items||[]).forEach(function(id){ if(!seen[id]&&ptItem(id)){ seen[id]=1; out.push(id); } }); });
+  return out;
 }
-function ptCrHub(){
-  var off=['cr-gen-reviewa','cr-gen-reviewb','cr-gen-mock1','cr-gen-mock2','cr-gen-mock3','cr-gen-mock4','cr-gen-mock5'].filter(function(i){ return ptItem(i); });
-  var oth=['cr-gen-ba3','cr-p1-b1','cr-p1-b2'].filter(function(i){ return ptItem(i); });
-  var done=off.filter(function(i){ return ptScore(i); }).length, all=[].concat(off,oth,['cr-gen-rnd']), n=0, s=0, g=ptScore('cr-gen-rnd');
-  all.forEach(function(i){ var sc=ptScore(i); if(sc){ n++; s+=sc.ok/sc.total; } });
-  return '<div class="card exhero"><div class="exh-e">CORPORATE REPORTING &middot; PARTIE A</div><div class="exh-t">QCM de l&#39;examen, sessions 1 a 15</div>'
-    + '<div class="exh-s">Format officiel, 18 QCM, 45 minutes, pas de points negatifs'+(n?' &middot; moyenne de tes blancs '+Math.round(s/n*100)+'%':'')+'</div>'+(g?'<div class="exh-s">Blancs generes : dernier '+g.ok+'/'+g.total+' &middot; meilleur '+g.best+' &middot; '+g.n+' essai'+(g.n>1?'s':'')+'</div>':'')
-    + '<div class="exh-b" style="margin-top:14px"><button type="button" class="cta pri" data-act="ptgen" data-k="std">Nouveau blanc, 18 QCM</button><button type="button" class="cta" data-act="ptgen" data-k="weak">Blanc sur mes points faibles</button></div></div>'
-    + '<div class="card pt-exam" style="margin-top:14px"><div class="pt-exam-h"><div class="pt-exam-t"><b>QCM officiels du cours</b><span>'+done+' sur '+off.length+' faits &middot; refais-les autant que tu veux, le dernier et le meilleur score sont gardes</span></div></div><div class="pt-items">'+off.map(ptRow).join('')+'</div></div>'
-    + '<div class="card pt-exam" style="margin-top:14px"><div class="pt-exam-h"><div class="pt-exam-t"><b>Blancs au format examen</b><span>Ecrits pour t&#39;entrainer, calculs et principes</span></div></div><div class="pt-items">'+oth.map(ptRow).join('')+'</div></div>';
+function ptRow(id){
+  var it=ptItem(id); if(!it) return '';
+  var sc=ptScore(id), det, st='';
+  if(it.type==='blanc'){
+    det=(it.mcq.length?it.mcq.length+' QCM':'')+(it.mcq.length&&it.open.length?' + ':'')+(it.open.length?it.open.length+' ouvertes':'')+' &middot; '+(it.duration||45)+' min';
+    st=sc?(sc.total?'<span class="pt-done">dernier '+sc.ok+'/'+sc.total+(sc.n>1?' &middot; meilleur '+sc.best+' &middot; '+sc.n+' essais':'')+'</span>':'<span class="pt-done">fait'+(sc.n>1?' &middot; '+sc.n+' essais':'')+'</span>'):'<span class="pt-new">nouveau</span>';
+  } else if(it.type==='official') det='Enonce et corrige sur Blackboard, connexion Bocconi';
+  else det=esc(it.sub||'Synthese a relire');
+  return '<button class="pt-item" data-go="#/pt/'+id+'"><span class="pt-item-t"><b>'+esc(it.title)+'</b><span>'+det+'</span></span>'+st+'</button>';
+}
+function ptHist(cid){
+  var S=ptScores(), h=[];
+  Object.keys(S).forEach(function(k){ if(k.indexOf(cid+'-')!==0) return; (S[k].hist||[{ok:S[k].ok,total:S[k].total,ts:S[k].ts}]).forEach(function(x){ if(x.total) h.push(x); }); });
+  h.sort(function(a,b){ return a.ts-b.ts; });
+  return h;
+}
+function exNextDl(cid){
+  var best=null; allDeadlines().forEach(function(d){ if(d.course!==cid||!/general exam|examen global|partial exam/i.test(d.label)||/2e session/i.test(d.label)) return; var n=dlDays(d.date); if(n==null||n<0) return; if(!best||n<best.n) best={n:n,d:d}; });
+  return best;
+}
+function exStrip(active){
+  return '<div class="exm-cd">'+COURSES.map(function(c){
+    var nx=exNextDl(c.id), h=ptHist(c.id), avg=h.length?Math.round(h.reduce(function(s,x){ return s+x.ok/x.total; },0)/h.length*100):null;
+    return '<button type="button" class="exm-cd-i'+(c.id===active?' on':'')+'" data-act="excourse" data-c="'+c.id+'"><span class="exm-cd-c">'+c.code+'</span>'
+      + (nx?'<b class="exm-cd-j">J-'+nx.n+'</b><span class="exm-cd-d">'+new Date(nx.d.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</span>':'<b class="exm-cd-j">&ndash;</b><span class="exm-cd-d">pas de date</span>')
+      + '<span class="exm-cd-p">'+(avg==null?'aucun blanc':avg+'% sur '+h.length+' blanc'+(h.length>1?'s':''))+'</span></button>';
+  }).join('')+'</div>';
+}
+function exTile(c,k,t,sub){ return '<button type="button" class="exm-tile" data-act="ptgen" data-c="'+c+'" data-k="'+k+'"><b>'+t+'</b><span>'+sub+'</span><i>Lancer &rarr;</i></button>'; }
+function exTiles(cid){
+  if(cid==='cr') return exTile('cr','std','Blanc Partie A','18 QCM, 45 min, sessions 1 a 14, 2/3 de calculs')
+    + exTile('cr','weak','Mes points faibles','18 QCM, tes erreurs et les questions pas encore vues en premier')
+    + exTile('cr','open','Blanc Partie B, ouvertes','5 calculs rediges, sessions 16 a 31, 60 min, corrige complet')
+    + ['b1','b2','b3'].map(function(k){ return exTile('cr',k,PT_BLOCKS[k].t,'12 QCM, 30 min, sessions '+PT_BLOCKS[k].s[0]+' a '+PT_BLOCKS[k].s[PT_BLOCKS[k].s.length-1]); }).join('');
+  if(cid==='da') return exTile('da','std','Blanc DA','15 QCM, 45 min, toutes les sessions')+exTile('da','data','Blanc datasets R','12 QCM sur SUP, TOP, WINE, PSA, 30 min')+exTile('da','weak','Mes points faibles','15 QCM, tes erreurs en premier');
+  if(cid==='fm') return exTile('fm','std','Blanc FM','15 QCM, 45 min, parties I et II')+exTile('fm','weak','Mes points faibles','15 QCM, tes erreurs en premier');
+  return exTile('cg','std','Blanc CG','15 QCM, 30 min')+exTile('cg','weak','Mes points faibles','15 QCM, tes erreurs en premier');
+}
+function exBars(cid){
+  var h=ptHist(cid).slice(-12); if(!h.length) return '<div class="exm-note">Aucun blanc fait pour l&#39;instant. Lance-en un, la courbe de tes scores apparaitra ici.</div>';
+  return '<div class="exm-bars">'+h.map(function(x){ var p=Math.round(x.ok/x.total*100); return '<i class="'+(p>=60?'ok':'ko')+'" style="height:'+Math.max(8,p)+'%" title="'+p+'%"><em>'+p+'</em></i>'; }).join('')+'</div><div class="exm-note">Chaque barre est un blanc, seuil de reussite a 60%.</div>';
+}
+function exPanel(cid){
+  var c=courseOf(cid), ex=ptExams().filter(function(x){ return x.course===cid&&x.kind==='exam'; }), nowIso=new Date().toISOString(), cur=null;
+  ex.forEach(function(x){ if(!cur&&String(x.date)>=nowIso.slice(0,16)) cur=x; }); if(!cur) cur=ex[ex.length-1];
+  var ids=ptItemsOf(cid), off=[],mai=[],opn=[],fic=[];
+  ids.forEach(function(id){ var it=ptItem(id); if(it.type==='mustknow') fic.push(id); else if(it.type==='official'||/officiel|mock|review/i.test(it.title)) off.push(id); else if(it.type==='blanc'&&!it.mcq.length) opn.push(id); else mai.push(id); });
+  function grp(t,sub,l){ return l.length?'<div class="card pt-exam" style="margin-top:14px"><div class="pt-exam-h"><div class="pt-exam-t"><b>'+t+'</b><span>'+sub+'</span></div></div><div class="pt-items">'+l.map(ptRow).join('')+'</div></div>':''; }
+  var h=ptHist(cid), best=h.length?Math.max.apply(null,h.map(function(x){ return Math.round(x.ok/x.total*100); })):null;
+  return '<div class="card exhero"><div class="exh-e">'+esc(c.name).toUpperCase()+'</div><div class="exh-t">'+(cur?esc(cur.label)+' &middot; '+esc(cur.dateLabel||''):'Pas d&#39;examen date')+'</div>'
+    + (cur?'<div class="exh-s">'+esc(cur.format)+'</div>'+(cur.scope?'<div class="exh-s">Perimetre : '+esc(cur.scope)+'</div>':''):'')
+    + '<div class="exm-hero-st"><div><b>'+h.length+'</b><span>blanc'+(h.length>1?'s':'')+' faits</span></div><div><b>'+(best==null?'&ndash;':best+'%')+'</b><span>meilleur score</span></div><div><b>'+(h.length?Math.round(h.reduce(function(s,x){ return s+x.ok/x.total; },0)/h.length*100)+'%':'&ndash;')+'</b><span>moyenne</span></div></div></div>'
+    + '<div class="card" style="margin-top:14px"><h2>Tes scores</h2>'+exBars(cid)+'</div>'
+    + '<div class="card" style="margin-top:14px"><h2>S&#39;entrainer, blanc genere a chaque fois</h2><p style="font-size:12.5px;color:var(--muted);margin:0 0 12px">Questions tirees de ta banque, niveau Difficile ou Expert, jamais deux blancs identiques. Pas de correction pendant le blanc, chrono en route.</p><div class="exm-tiles">'+exTiles(cid)+'</div></div>'
+    + grp('QCM officiels et mocks','Refais-les autant que tu veux, le dernier et le meilleur score sont gardes',off)
+    + grp('Blancs au format examen','Ecrits pour t&#39;entrainer, calculs et principes',mai)
+    + grp('Questions ouvertes','Redige, puis compare au corrige detaille',opn)
+    + grp('Fiches et programme','Pour relire avant de t&#39;entrainer',fic);
 }
 function vExams(){
-  var up=allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null && n>=0; }).slice(0,6);
-  return '<div class="page-h">Examens</div><div class="page-sub">Entraine-toi sur le format officiel, puis dates et notes.</div>'
-    + ptCrHub() + '<div style="height:18px"></div>'
-    + '<div class="card" style="margin-bottom:18px"><h2>Prochaines dates <button class="tag" data-go="#/dl">Tout voir</button></h2>'+(up.length?up.map(dlRow).join(''):'<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>')+'</div>'
-    + '<div class="hmgrid">'
-    + homeTile('#/pt','Tous les partiels','FM, DA, Partie B CR, must know et programme de revision',IC.pdf)
+  var cid=store.exCourse||store.focus||'cr'; if(!COURSES.some(function(c){ return c.id===cid; })) cid='cr';
+  return '<div class="page-h">Examens</div><div class="page-sub">Choisis un cours, entraine-toi en conditions reelles, suis tes scores.</div>'
+    + exStrip(cid) + exPanel(cid)
+    + '<div class="hmgrid" style="margin-top:18px">'
+    + homeTile('#/pt','Tous les partiels','Liste complete, must know et programme de revision',IC.pdf)
     + homeTile('#/moy','Mes moyennes','tes notes par epreuve et la moyenne par matiere',IC.data)
-    + '</div>';
+    + '</div>'
+    + '<div class="card" style="margin-top:18px"><h2>Prochaines dates <button class="tag" data-go="#/dl">Tout voir</button></h2>'+(function(){ var up=allDeadlines().filter(function(d){ var n=dlDays(d.date); return n!=null&&n>=0; }).slice(0,6); return up.length?up.map(dlRow).join(''):'<p style="font-size:12.5px;color:var(--muted)">Aucune echeance a venir.</p>'; })()+'</div>';
 }
 function homeSec(title, sub){ return '<div class="hsec"><h2>'+title+'</h2>'+(sub?'<span>'+sub+'</span>':'')+'</div>'; }
 function todayPlanCard(){
@@ -1741,9 +1823,10 @@ document.addEventListener('click', function(e){
     if(act==='ptnext'){ if(ptb&&ptb.idx<ptTotal()-1){ptb.idx++;render();} return; }
     if(act==='ptprev'){ if(ptb&&ptb.idx>0){ptb.idx--;render();} return; }
     if(act==='ptfinish'){ ptCapture(); var un=ptb?ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]===undefined; }).length:0; if(un&&!confirm('Il te reste '+un+' question'+(un>1?'s':'')+' sans reponse. Terminer quand meme ?')) return; ptFinish(); return; }
-    if(act==='ptretry'){ if(ptb&&ptb.gen){ ptb={itemId:ptb.itemId,item:ptb.item,idx:0,phase:'run',ans:{},texts:{},t0:Date.now(),gen:ptb.gen}; render(); } else ptStart(ptb.itemId); return; }
+    if(act==='ptretry'){ if(ptb&&ptb.gen){ ptb={itemId:ptb.itemId,item:ptb.item,idx:0,phase:'run',ans:{},texts:{},t0:Date.now(),gen:ptb.gen,genC:ptb.genC}; render(); } else ptStart(ptb.itemId); return; }
     if(act==='ptwrong'){ ptRetryWrong(); return; }
-    if(act==='ptgen'){ ptStartGen(a.getAttribute('data-k')); return; }
+    if(act==='ptgen'){ ptStartGen(a.getAttribute('data-k'),a.getAttribute('data-c')); return; }
+    if(act==='excourse'){ store.exCourse=a.getAttribute('data-c'); save(); render(); return; }
     if(act==='dladd'){
       var lbl = ($('#dlLabel')||{}).value, dt = ($('#dlDate')||{}).value, crs = ($('#dlCourse')||{}).value;
       if(lbl && dt){ var id = 'c'+Date.now(); store.dlCustom[id] = {course:crs, label:lbl, date:dt, kind:'perso'}; save(); render(); }
