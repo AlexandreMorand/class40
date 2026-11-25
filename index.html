@@ -326,6 +326,24 @@ footer{margin-top:26px;text-align:center;color:var(--muted);font-size:11px}
 .exsupp{font-size:13px;margin:0 0 10px}
 .opt.dim{opacity:.55}
 .extool{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.extool .cta{flex:1 1 auto}
+/* mode concentration: exercices, QCM et blancs prennent toute la largeur */
+@media(min-width:901px){
+.main.focus{max-width:1560px;padding-left:44px;padding-right:44px}
+.main.focus .qcard{max-width:none;padding:30px 34px}
+.main.focus .qmeta{max-width:none!important;font-size:13px}
+.main.focus .qq{font-size:21px;line-height:1.5;margin-bottom:22px}
+.main.focus .opt{font-size:16.5px;padding:17px 20px;margin-bottom:11px}
+.main.focus .opt .k{width:34px;height:34px;font-size:14px}
+.main.focus .expl{font-size:15.5px;padding:16px 20px}
+.main.focus .exw{font-size:15px}
+.main.focus .excard{padding:30px 34px 22px}
+.main.focus .excard .opt,.main.focus .excard .exopt{font-size:17.5px;line-height:1.5;padding:18px 22px}
+.main.focus .qq{font-size:23px}.main.focus .opt{font-size:18px}
+.main.focus .excard .exq-s{font-size:19px}
+.main.focus .exstem,.main.focus .exbody{font-size:16px}
+.main.focus .page-h{font-size:30px}
+}
+@media(max-width:900px){.main.focus .qq{font-size:17px}.main.focus .opt{font-size:14.5px}}
 </style>
 </head>
 <body>
@@ -338,9 +356,9 @@ window.addEventListener('error', function(e){
   }
 }, true);
 </script>
-<script src="data.js?v=lot174-20261118"></script>
-<script src="levels.js?v=lot174-20261118" async></script>
-<script src="app.js?v=lot174-20261118"></script>
+<script src="data.js?v=lot175-20261118"></script>
+<script src="levels.js?v=lot175-20261118" async></script>
+<script src="app.js?v=lot175-20261118"></script>
 </body>
 </html>
 <style>

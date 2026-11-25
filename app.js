@@ -1687,6 +1687,7 @@ function render(){
     default: content = vHome();
   }
   root.innerHTML = shell(content, r);
+  var mnF=root.querySelector('.main'); if(mnF) mnF.classList.toggle('focus', ['quiz','qplay','ex','ptitem','recall','flash'].indexOf(r.page)>=0);
   requestAnimationFrame(function(){
     $$('.bar i[data-w]').forEach(function(i){ i.style.width = i.getAttribute('data-w')+'%'; });
     var ring = $('#heroRing');
