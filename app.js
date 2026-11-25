@@ -213,6 +213,7 @@ function parseHash(){
   if(p[0]==='plan') return {page:'plan'};
   if(p[0]==='rev') return {page:'rev'};
   if(p[0]==='exam') return {page:'exam'};
+  if(p[0]==='err') return {page:'err', sub:p[1]||null};
   if(p[0]==='rc'&&p[1]) return {page:'recall', course:p[1]};
   if(p[0]==='c'&&p[1]) return {page:'course', course:p[1]};
   if(p[0]==='s'&&p[1]&&p[2]!=null) return {page:'session', course:p[1], n:p[2]};
@@ -303,8 +304,15 @@ function ptFmtT(s){ var n=s<0, a=Math.abs(s), m=Math.floor(a/60), r=a%60; return
 setInterval(function(){ var el=document.getElementById('ptTimer'); if(!el||!ptb||ptb.phase!=='run'||!ptb.t0) return; var left=Math.round((ptb.item.duration||45)*60-(Date.now()-ptb.t0)/1000); el.textContent=ptFmtT(left); el.className='pt-timer'+(left<0?' late':left<300?' low':''); },1000);
 function ptAnswer(i){ if(!ptb||ptb.phase!=='run') return; if(ptb.idx>=ptb.item.mcq.length) return; ptb.ans[ptb.idx]=i; render(); }
 function ptCapture(){ var ta=document.getElementById('ptTa'); if(ta&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=ta.value; } }
-function ptFinish(){ if(!ptb) return; ptCapture(); var ok=0; ptb.item.mcq.forEach(function(q,i){ if(ptb.ans[i]===q.correct) ok++; }); ptb.score={ok:ok, total:ptb.item.mcq.length}; ptb.phase='done'; if(!ptb.noSave) ptSaveScore(ptb.itemId, ok, ptb.item.mcq.length); render(); }
-document.addEventListener('input', function(e){ if(e.target&&e.target.id==='ptTa'&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=e.target.value; } });
+function ptCaptureErrors(){
+  var c=String(ptb.itemId).slice(0,2); if(['cr','da','fm','cg'].indexOf(c)<0) c='cr'; var n=0;
+  ptb.item.mcq.forEach(function(q,i){ var k='p:'+errHash(q.q), mine=ptb.ans[i];
+    if(mine===q.correct) errRight(k); else { errAdd({k:k,src:'pt',course:c,session:String(q.session||''),topic:ptb.item.title,q:q.q,choices:q.choices,correct:q.correct,expl:q.expl||'',choice:mine==null?null:mine}); n++; } });
+  return n;
+}
+function ptFinish(){ if(!ptb) return; ptCapture(); var ok=0; ptb.item.mcq.forEach(function(q,i){ if(ptb.ans[i]===q.correct) ok++; }); ptb.score={ok:ok, total:ptb.item.mcq.length}; ptb.errAdded=ptCaptureErrors(); ptb.phase='done'; if(!ptb.noSave) ptSaveScore(ptb.itemId, ok, ptb.item.mcq.length); render(); }
+document.addEventListener('input', function(e){ if(e.target&&e.target.id==='errNote'&&errp){ var ee=errs()[errp.queue[errp.idx]]; if(ee){ ee.note=e.target.value; save(); } return; }
+  if(e.target&&e.target.id==='ptTa'&&ptb&&ptb.phase==='run'&&ptb.idx>=ptb.item.mcq.length){ ptb.texts[ptb.idx-ptb.item.mcq.length]=e.target.value; } });
 function vPartiels(){
   var html = '<div class="page-h">Partiels</div><div class="page-sub">Must know et partiels blancs au format officiel, du plus proche au plus lointain.</div>';
   ptExams().forEach(function(ex){
@@ -355,6 +363,7 @@ function vPtBlanc(it){
     var h = back + '<div class="page-h">'+esc(it.title)+' &middot; corrige</div>'
       + (ptb.score.total>0 ? '<div class="qcard" style="text-align:center;margin-bottom:16px"><div class="score-big">'+ptb.score.ok+' / '+ptb.score.total+'</div>'
       + '<p style="color:var(--muted);font-weight:600;margin:6px 0 4px">QCM &middot; corrige detaille ci-dessous</p>'
+      + (ptb.errAdded?'<p style="font-size:13px;margin:8px 0"><b>'+ptb.errAdded+' erreur'+(ptb.errAdded>1?'s':'')+'</b> ajoutee'+(ptb.errAdded>1?'s':'')+' a ton rappel du jour. <button type="button" class="cta pri" style="padding:7px 14px;font-size:12.5px" data-go="#/err">Les revoir maintenant</button></p>':'')
       + (ptb.item.open.length ? '<p style="font-size:12.5px;color:var(--muted);font-weight:600">Pour les ouvertes, compare ta redaction a la solution detaillee.</p>' : '') + '</div>' : '<div class="qcard" style="text-align:center;margin-bottom:16px"><p style="color:var(--muted);font-weight:600;margin:6px 0 4px">Corrige detaille ci-dessous &middot; compare ta redaction a la solution.</p></div>');
     ptb.item.mcq.forEach(function(q, i){
       var mine = ptb.ans[i];
@@ -737,12 +746,155 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('keydown',function(e){
   if(e.metaKey||e.ctrlKey||e.altKey||/^#\/ex\//.test(location.hash)) return;
   var t=e.target&&e.target.tagName; if(t==='INPUT'||t==='TEXTAREA'||document.querySelector('.omni')) return;
-  var opts=document.querySelectorAll('button[data-act="ans"],button[data-act="ptans"]'); if(!opts.length) return;
+  var opts=document.querySelectorAll('button[data-act="ans"],button[data-act="ptans"],button[data-act="errans"],button[data-act="errtwinans"]'); if(!opts.length) return;
   var k=e.key.toLowerCase(), idx='abcd'.indexOf(k); if(idx<0) idx=['1','2','3','4'].indexOf(k);
   if(idx>=0 && k.length===1){ if(opts[idx]){ opts[idx].click(); e.preventDefault(); } return; }
-  if(e.key==='Enter'||e.key==='ArrowRight'){ var n=document.querySelector('[data-act="qnext"]')||document.querySelector('[data-act="ptnext"]')||document.querySelector('[data-act="qskip"]'); if(n){ n.click(); e.preventDefault(); } }
+  if(e.key==='Enter'||e.key==='ArrowRight'){ var n=document.querySelector('[data-act="qnext"]')||document.querySelector('[data-act="errnext"]')||document.querySelector('[data-act="ptnext"]')||document.querySelector('[data-act="qskip"]'); if(n){ n.click(); e.preventDefault(); } }
   if(e.key==='ArrowLeft'){ var p=document.querySelector('[data-act="qprev"]')||document.querySelector('[data-act="ptprev"]'); if(p){ p.click(); e.preventDefault(); } }
 });
+
+/* ---------- RAPPEL DU JOUR : erreurs gardees, espacement, explications poussees ---------- */
+var ERR_STEPS=[0,1,3,7,14,30];
+var errp=null;
+function errs(){ store.errs=store.errs||{}; return store.errs; }
+function errDay(t){ var d=new Date(t||Date.now()); d.setHours(0,0,0,0); return d.getTime(); }
+function errHash(s){ var h=5381,i; for(i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
+function errAdd(sn){
+  var E=errs(), e=E[sn.k], now=Date.now();
+  if(!e){ e=E[sn.k]={k:sn.k,src:sn.src,course:sn.course,session:sn.session,topic:sn.topic||'',q:sn.q,choices:sn.choices,correct:sn.correct,expl:sn.expl||'',first:sn.ts||now,wrong:0,stage:0,note:''}; }
+  e.wrong++; e.last=sn.ts||now; e.choice=(sn.choice==null?null:sn.choice); e.stage=0; e.due=now; e.mastered=false; if(sn.expl) e.expl=sn.expl;
+  save(); return e;
+}
+function errRight(k){
+  var e=errs()[k]; if(!e||e.mastered||e.due>Date.now()) return;
+  e.stage++; e.lastOk=Date.now();
+  if(e.stage>=ERR_STEPS.length){ e.mastered=true; e.due=9e15; } else e.due=errDay()+ERR_STEPS[e.stage]*86400000;
+  save();
+}
+function errMiss(k,choice){ var e=errs()[k]; if(!e) return; e.wrong++; e.stage=0; e.due=Date.now(); e.last=Date.now(); e.choice=choice; e.mastered=false; save(); }
+function errDueList(){ var end=errDay()+86400000-1, out=[]; var E=errs(); Object.keys(E).forEach(function(k){ var e=E[k]; if(!e.mastered&&e.due<=end) out.push(e); }); out.sort(function(a,b){ return (b.last||0)-(a.last||0); }); return out; }
+function errTodayList(){ var t0=errDay(), out=[]; var E=errs(); Object.keys(E).forEach(function(k){ var e=E[k]; if(!e.mastered&&(e.last||0)>=t0) out.push(e); }); out.sort(function(a,b){ return (b.last||0)-(a.last||0); }); return out; }
+function errBankIndex(){
+  if(errBankIndex.c) return errBankIndex.c; var m={};
+  Object.keys(D.QCM||{}).forEach(function(cid){ (D.QCM[cid]||[]).forEach(function(q){ m[q.id]={cid:cid,q:q,s:contentSessionKey(cid,q)}; }); });
+  var L=D.QCM_LEVELS||{}; Object.keys(L).forEach(function(cid){ Object.keys(L[cid]).forEach(function(s){ (L[cid][s]||[]).forEach(function(q){ m[q.id]={cid:cid,q:q,s:q.session||s}; }); }); });
+  ((D.QCM_DATA||{}).da||[]).forEach(function(q){ m[q.id]={cid:'da',q:q,s:q.session}; });
+  if(levelsReady()) errBankIndex.c=m; return m;
+}
+function errFromBank(cid,q,choice,ts,sess){ var ss=(sess!=null&&sess!=='undefined')?sess:(contentSessionKey(cid,q)||q.session); if(ss==null||ss==='undefined') ss=''; return {k:'b:'+cid+':'+q.id,src:'bank',course:cid,session:String(ss),topic:q.topic||'',q:q.question,choices:q.choices,correct:q.correct_index,expl:q.explanation||'',choice:choice,ts:ts}; }
+function errExSnap(i,q,j,c,choice){ return {k:'x:'+exKey(i,j),src:'ex',course:'cr',session:'Ch '+c.n,topic:c.t||'',q:'Exercise '+i.n+(q.p?' ('+q.p+')':'')+'. '+q.s,choices:q.c,correct:q.k,expl:q.e||'',choice:choice}; }
+function errFromEx(xn,xk){
+  var f=exFind(xn); if(!f) return; var i=f.i, j=0, qs=exQs(i);
+  if(xk.indexOf('#')>=0){ var p=xk.split('#')[1]; qs.forEach(function(q,t){ if(q.p===p) j=t; }); }
+  var q=qs[j]; if(!q||!exHas(xk)) return; var ch=exAns(xk);
+  if(ch===q.k) errRight('x:'+xk); else errAdd(errExSnap(i,q,j,f.c,ch));
+}
+function errMigrate(){
+  if(store.errsMig||!levelsReady()) return;
+  var idx=errBankIndex(), last={};
+  (store.attempts||[]).forEach(function(a){ if(!last[a.questionId]||a.ts>=last[a.questionId].ts) last[a.questionId]=a; });
+  Object.keys(last).forEach(function(id){ var a=last[id], b=idx[id]; if(a.correct||!b) return; var e=errAdd(errFromBank(b.cid,b.q,a.choice,a.ts,b.s)); e.wrong=1; });
+  var E=exData(); if(E) E.chapters.forEach(function(c){ c.items.forEach(function(i){ exQs(i).forEach(function(q,j){ var k=exKey(i,j); if(exHas(k)&&exAns(k)!==q.k){ var e=errAdd(errExSnap(i,q,j,c,exAns(k))); e.wrong=1; e.first=e.last=Date.now()-86400000*(1+(j%20)); } }); }); });
+  store.errsMig=1; save();
+}
+function errTwin(e){
+  if(e.src!=='bank') return null; var id=e.k.split(':').slice(2).join(':'), b=errBankIndex()[id]; if(!b||!b.q.topic) return null;
+  var m=bestByQuestion(), pool=allQuestions(e.course).filter(function(q){ return q.id!==b.q.id&&q.topic===b.q.topic&&(q.session||b.s)==(b.q.session||b.s); });
+  pool=pool.filter(function(q){ var x=m[questionProgressKey(e.course,q)]; return !(x&&x.correct); });
+  return pool.length?{cid:e.course,q:pool[Math.floor(Math.random()*pool.length)],s:b.s}:null;
+}
+function errCard(){
+  var n=errDueList().length, t=errTodayList().length; if(!n&&!t) return '';
+  return '<div class="card errhero"><div class="errh-t"><b>Rappel du jour</b><span>'+(n?n+' erreur'+(n>1?'s':'')+' a revoir':'Rien a revoir maintenant')+(t?' &middot; '+t+' ajoutee'+(t>1?'s':'')+' aujourd&#39;hui':'')+'</span></div><button type="button" class="cta pri" data-go="#/err">'+(n?'Commencer':'Voir')+' &rarr;</button></div>';
+}
+function errDeep(e){
+  var L=String(e.expl||'').split('\n').filter(function(l){ return l.trim(); }), wr=L.filter(function(l){ return /^Wrong /.test(l); }), main=L.filter(function(l){ return !/^Wrong /.test(l); });
+  var h='', ch=e.choice, hasCh=(ch!=null&&ch!==e.correct&&e.choices[ch]!=null);
+  if(hasCh){ var my=wr.filter(function(l){ return l.indexOf('Wrong '+'ABCD'[ch]+'.')===0; })[0];
+    h+='<div class="errsec ko"><div class="errsec-t">Ce que tu avais choisi</div><div class="errc"><b>'+'ABCD'[ch]+'</b> '+esc(e.choices[ch])+'</div>'+(my?'<div class="exws exbad">'+esc(my.replace(/^Wrong [A-D]\.\s*/,''))+'</div>':'<div class="exws">Cette option est fausse, la regle ci-dessous explique pourquoi.</div>')+'</div>'; }
+  else if(ch==null&&e.src==='pt') h+='<div class="errsec ko"><div class="errsec-t">Pas de reponse</div><div class="exws">Tu n&#39;avais pas repondu a cette question dans le blanc.</div></div>';
+  var rule=main[0]||'', rest=main.slice(1);
+  if(rule){ h+='<div class="errsec ok"><div class="errsec-t">La regle a retenir</div><div class="exws">'+esc(rule.replace(/^In plain words\.\s*/,''))+'</div></div>'; }
+  if(rest.length) h+='<div class="errsec"><div class="errsec-t">Le raisonnement pas a pas</div>'+qExp(rest.join('\n'))+'</div>';
+  var others=wr.filter(function(l){ return !(hasCh&&l.indexOf('Wrong '+'ABCD'[ch]+'.')===0); });
+  if(others.length) h+='<details class="errsec"><summary class="errsec-t">Les autres pieges de la question</summary>'+others.map(function(l){ return '<div class="exws exbad">'+esc(l)+'</div>'; }).join('')+'</details>';
+  var links='', fu=e.course&&/^\d+$/.test(String(e.session))?ficheUrl(e.course,e.session):null;
+  if(fu) links+='<a href="'+esc(fu)+'" target="_blank" rel="noopener">Relire la fiche de la session '+esc(e.session)+'</a>';
+  if(e.course&&/^\d+$/.test(String(e.session))) links+=' <a href="#/f/'+e.course+'/'+esc(e.session)+'">Flashcards de la session</a>';
+  if(e.course==='cr'){ var cs=/^\d+$/.test(String(e.session))?exChaptersForSession(e.session):[]; if(e.src==='ex'){ var cn=String(e.session).replace('Ch ',''); cs=(exData()?exData().chapters.filter(function(x){ return String(x.n)===cn; }):[]); }
+    var mh=cs.length?exMethHtml(cs[0],{k:'calculation',n:'0'},null):''; if(mh) h+='<div class="errsec"><div class="errsec-t">Rappel de methode</div>'+mh+'</div>'; }
+  if(links) h+='<div class="errlinks">'+links+'</div>';
+  h+='<div class="errsec"><div class="errsec-t">Ta regle en une phrase</div><textarea id="errNote" class="pt-ta" style="min-height:64px" placeholder="Explique-toi pourquoi la bonne reponse est la bonne, avec tes mots. Elle te sera montree la prochaine fois.">'+esc(e.note||'')+'</textarea></div>';
+  return h;
+}
+function vErr(sub){
+  errMigrate();
+  if(sub==='play') return vErrPlay();
+  if(!levelsReady()&&!store.errsMig) return '<button class="back" data-go="#/rev">&larr; Reviser</button><div class="page-h">Rappel du jour</div><div class="card"><p style="font-size:13px;color:var(--muted)">Chargement de tes erreurs...</p></div>';
+  var E=errs(), all=Object.keys(E).map(function(k){ return E[k]; }), due=errDueList(), today=errTodayList(), mast=all.filter(function(e){ return e.mastered; }).length, act=all.length-mast;
+  var byc={}; due.forEach(function(e){ byc[e.course]=(byc[e.course]||0)+1; });
+  var sched=[]; for(var d=1;d<=7;d++){ var t0=errDay()+d*86400000, c=0; all.forEach(function(e){ if(!e.mastered&&e.due>=t0&&e.due<t0+86400000) c++; }); sched.push(c); }
+  var mx=Math.max(1,Math.max.apply(null,sched));
+  var h='<button class="back" data-go="#/rev">&larr; Reviser</button><div class="page-h">Rappel du jour</div><div class="page-sub">Tes erreurs reviennent a 1, 3, 7, 14 puis 30 jours, tant que tu ne les maitrises pas.</div>';
+  h+='<div class="card exhero"><div class="exh-e">A REVOIR AUJOURD&#39;HUI</div><div class="exh-t">'+due.length+' erreur'+(due.length>1?'s':'')+'</div><div class="exh-s">'+today.length+' ajoutee'+(today.length>1?'s':'')+' aujourd&#39;hui &middot; '+act+' en suivi &middot; '+mast+' maitrisee'+(mast>1?'s':'')+'</div>'
+    + '<div class="exh-b" style="margin-top:14px">'+(due.length?'<button type="button" class="cta pri" data-act="errstart" data-m="due">Commencer le rappel ('+Math.min(15,due.length)+')</button>':'')+(today.length?'<button type="button" class="cta" data-act="errstart" data-m="today">Mes erreurs d&#39;aujourd&#39;hui ('+today.length+')</button>':'')+'</div></div>';
+  if(!all.length) h+='<div class="card" style="margin-top:14px"><p style="font-size:13.5px;line-height:1.6">Aucune erreur gardee pour l&#39;instant. Des que tu te trompes dans un QCM, un blanc ou un exercice du livre, la question arrive ici avec ta reponse, une explication detaillee et un rappel programme.</p></div>';
+  else {
+    h+='<div class="card" style="margin-top:14px"><h2>Les 7 prochains jours</h2>'+(Math.max.apply(null,sched)===0?'<div class="exm-note">Rien de programme pour l&#39;instant. Quand tu reussis une erreur, elle revient automatiquement 1, 3, 7, 14 puis 30 jours plus tard.</div>':'<div class="exm-bars" style="height:80px">'+sched.map(function(n,i){ var dt=new Date(errDay()+(i+1)*86400000).toLocaleDateString('fr-FR',{weekday:'short'}); return '<i class="ok" style="height:'+Math.max(6,Math.round(n/mx*100))+'%"><em>'+n+'</em><b class="errdl">'+dt+'</b></i>'; }).join('')+'</div>')+'</div>';
+    h+='<details class="exdet" style="margin-top:14px"><summary>Toutes mes erreurs ('+act+')</summary><div class="card" style="margin-top:8px">'+all.filter(function(e){ return !e.mastered; }).sort(function(a,b){ return (a.due||0)-(b.due||0); }).map(function(e){ return '<div class="errrow"><span class="errrow-c">'+esc(String(e.course).toUpperCase())+' '+esc(String(e.session||''))+'</span><span class="errrow-q">'+esc(String(e.q).slice(0,110))+'</span><span class="errrow-s">'+(e.stage?'palier '+e.stage:'nouveau')+' &middot; rate '+e.wrong+'x</span></div>'; }).join('')+'</div></details>';
+  }
+  return h;
+}
+function errStart(mode){
+  var list=mode==='today'?errTodayList():errDueList(); if(mode==='more'&&errp){ var used={}; errp.queue.forEach(function(k){ used[k]=1; }); list=errDueList().filter(function(e){ return !used[e.k]; }); }
+  var q=list.slice(0,mode==='today'?40:(mode==='more'?10:15)).map(function(e){ return e.k; }); if(!q.length) return;
+  errp={queue:q,idx:0,phase:'think',ok:0,ko:[],req:{},sel:null,twin:null};
+  location.hash='#/err/play'; render();
+}
+function vErrPlay(){
+  if(!errp||!errp.queue.length){ location.replace('#/err'); return ''; }
+  var total=errp.queue.length, head='<button class="back" data-go="#/err">&larr; Rappel du jour</button><div class="page-h">Rappel actif</div>';
+  if(errp.idx>=total){
+    var left=errDueList().filter(function(e){ return errp.queue.indexOf(e.k)<0; }).length;
+    return head+'<div class="qcard" style="text-align:center;padding:30px 20px"><div class="score-big">'+errp.ok+' / '+total+'</div><p style="color:var(--muted);font-weight:600;margin:6px 0 14px">reussies du premier coup</p>'
+      + '<p style="font-size:13px;margin-bottom:18px">'+(errp.ko.length?errp.ko.length+' question'+(errp.ko.length>1?'s':'')+' a retravailler, elle'+(errp.ko.length>1?'s':'')+' reviendra'+(errp.ko.length>1?'ont':'')+' demain.':'Tout est retrouve, les prochains rappels sont programmes.')+'</p>'
+      + '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'+(left?'<button class="cta pri" data-act="errstart" data-m="more">Encore '+Math.min(10,left)+' erreurs</button>':'')+'<button class="cta line" data-go="#/err">Retour</button></div></div>';
+  }
+  var e=errs()[errp.queue[errp.idx]]; if(!e){ errp.idx++; return vErrPlay(); }
+  var sessL=(e.session&&e.session!=='undefined')?' &middot; '+esc(String(e.session)):'';
+  var meta='<div class="qmeta"><span>'+(errp.idx+1)+' / '+total+'</span><div class="bar"><i style="width:'+Math.round(errp.idx/total*100)+'%"></i></div><span>'+errp.ok+' reussies</span></div>'
+    + '<div class="qmeta"><span>'+esc(String(e.course).toUpperCase())+sessL+(e.topic&&e.src!=='pt'?' &middot; '+esc(e.topic):'')+'</span><span style="margin-left:auto">rate '+e.wrong+' fois &middot; '+(e.stage?'palier '+e.stage:'nouvelle')+'</span></div>';
+  var stem='<div class="qq">'+esc(e.q)+'</div>', body;
+  if(errp.phase==='think'){
+    body=stem+(e.note?'<details class="errsec"><summary class="errsec-t">Voir ma regle de la derniere fois</summary><div class="exws">'+esc(e.note)+'</div></details>':'')
+      + '<div class="expl" style="margin:14px 0"><b>Avant de voir les choix :</b> reponds de tete ou ecris ta reponse avec le raisonnement. Se forcer a produire la reponse ancre bien mieux que reconnaitre la bonne option.</div>'
+      + '<textarea id="errThought" class="pt-ta" style="min-height:70px" placeholder="Ta reponse, en une ou deux phrases ou avec le calcul"></textarea>'
+      + '<div class="qfoot"><span></span><button class="cta pri" data-act="errreveal">Voir les choix</button></div>';
+  } else if(errp.phase==='choose'){
+    body=stem+e.choices.map(function(ch,i){ return '<button class="opt" data-act="errans" data-i="'+i+'"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></button>'; }).join('')+'<div class="qfoot"><span style="font-size:11.5px;color:var(--muted);font-weight:600">Choisis une reponse</span></div>';
+  } else if(errp.phase==='fb'){
+    var sel=errp.sel, ok=sel===e.correct;
+    body='<div class="'+(ok?'pt-done':'pt-wrong')+'" style="display:inline-block;margin-bottom:10px">'+(ok?'Juste':'Pas cette fois')+'</div>'+stem
+      + e.choices.map(function(ch,i){ var c='opt '+(i===e.correct?'right':(i===sel?'wrong':'dim')); return '<div class="'+c+'" style="cursor:default"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></div>'; }).join('')
+      + (errp.thought?'<div class="pt-your" style="margin:10px 0"><b>Ta reponse de tete</b>'+esc(errp.thought)+'</div>':'')
+      + errDeep(Object.assign({},e,{choice:sel}))
+      + '<div class="qfoot">'+(errTwin(e)&&!ok?'<button class="cta line" data-act="errtwin">Me tester sur une variante</button>':'<span></span>')+'<button class="cta pri" data-act="errnext">'+(errp.idx===total-1?'Voir le bilan':'Suivante')+' &rarr;</button></div>';
+  } else {
+    var tw=errp.twin, tq=tw.q;
+    if(errp.twinSel==null) body='<div class="expl" style="margin:0 0 12px"><b>Variante :</b> meme notion, autre question.</div><div class="qq">'+esc(tq.question)+'</div>'+tq.choices.map(function(ch,i){ return '<button class="opt" data-act="errtwinans" data-i="'+i+'"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></button>'; }).join('');
+    else body='<div class="qq">'+esc(tq.question)+'</div>'+tq.choices.map(function(ch,i){ var c='opt '+(i===tq.correct_index?'right':(i===errp.twinSel?'wrong':'dim')); return '<div class="'+c+'" style="cursor:default"><span class="k">'+'ABCD'[i]+'</span><span>'+esc(ch)+'</span></div>'; }).join('')
+      + '<div class="expl"><b>Pourquoi :</b> '+qExp(tq.explanation||'')+'</div><div class="qfoot"><span></span><button class="cta pri" data-act="errnext">'+(errp.idx===total-1?'Voir le bilan':'Suivante')+' &rarr;</button></div>';
+  }
+  return head+'<div class="qcard">'+meta+body+'</div>';
+}
+function errAnswer(i){
+  var e=errs()[errp.queue[errp.idx]]; if(!e||errp.phase!=='choose') return;
+  var ok=i===e.correct; errp.sel=i; errp.phase='fb'; errp.thought=(document.getElementById('errThought')||{}).value||errp.thought||'';
+  if(ok){ if(!errp.req[e.k]) errp.ok++; errRight(e.k); }
+  else { errMiss(e.k,i); errp.ko.push(e.k); }
+  if(e.src==='bank'){ var id=e.k.split(':').slice(2).join(':'); addAttempt({course:e.course,session:String(e.session),questionId:id,topic:e.topic,correct:ok,ts:Date.now(),source:'recall',secs:0,choice:i}); }
+  render();
+}
 
 /* ---------- DEADLINES ---------- */
 function allDeadlines(){
@@ -908,6 +1060,7 @@ function vRevise(){
   var cid=state.course, c=courseOf(cid);
   return '<div class="page-h">Reviser</div><div class="page-sub">Tout ce qui sert a retenir et a corriger, au meme endroit.</div>'
     + coursePills()
+    + errCard()
     + homeSec('1. Corriger mes fautes','ce que tu as rate, de toutes les matieres')
     + mistakesBlock()
     + homeSec('2. Revision du jour','selon l&#39;espacement, pour '+esc(c.name))
@@ -1028,6 +1181,7 @@ function vHome(){
       + '</div></div>';
     })()
 
+  + errCard()
   + homeSec('Aujourd&#39;hui','ce qu&#39;il faut faire maintenant')
   + todayPlanCard()
   + mistakesBlock()
@@ -1192,7 +1346,8 @@ function answerQuiz(i){
   quiz.answered[q.id] = {choice:i, correct:correct};
   if(correct) quiz.ok++;
   var secs = Math.round((Date.now()-quiz.t0)/1000); quiz.t0 = Date.now();
-  addAttempt({course:quiz.cid, session:contentSessionKey(quiz.cid,q), questionId:String(q.id), topic:q.topic||'', correct:correct, ts:Date.now(), source:quiz.src==='dataset'?'dataset':(quiz.n==null||quiz.n==='all'?'blanc':'session'), secs:secs});
+  addAttempt({course:quiz.cid, session:contentSessionKey(quiz.cid,q), questionId:String(q.id), topic:q.topic||'', correct:correct, ts:Date.now(), source:quiz.src==='dataset'?'dataset':(quiz.n==null||quiz.n==='all'?'blanc':'session'), secs:secs, choice:i});
+  if(!correct) errAdd(errFromBank(quiz.cid,q,i,Date.now(),(quiz.n&&quiz.n!=='all')?quiz.n:null)); else errRight('b:'+quiz.cid+':'+q.id);
   render();
 }
 
@@ -1761,6 +1916,7 @@ function render(){
     case 'plan': content = vPlan(); break;
     case 'rev': content = vRevise(); break;
     case 'exam': content = vExams(); break;
+    case 'err': content = vErr(r.sub); break;
     case 'recall': content = vRecall(r.course); break;
     case 'partiels': content = vPartiels(); break;
     case 'ptitem': content = vPtItem(r.item); break;
@@ -1802,7 +1958,7 @@ document.addEventListener('click', function(e){
     if(act==='rcretry'){ rcs.bank=rcs.ko.slice(); rcs.idx=0; rcs.rev=false; rcs.ok=0; rcs.ko=[]; render(); return; }
     if(act==='mqstart'){ startMistakeQuiz(a.getAttribute('data-cid')); return; }
     if(act==='srsquiz'){ startSrsQuiz(a.getAttribute('data-cid')); return; }
-        if(act==='exans'){ var xn=a.getAttribute('data-n'), xk=a.getAttribute('data-key'); store.exAns=store.exAns||{}; if(store.exAns[xk]===undefined){ store.exAns[xk]=parseInt(a.getAttribute('data-i'),10); save(); exRefresh(xn); } e.preventDefault(); return; }
+        if(act==='exans'){ var xn=a.getAttribute('data-n'), xk=a.getAttribute('data-key'); store.exAns=store.exAns||{}; if(store.exAns[xk]===undefined){ store.exAns[xk]=parseInt(a.getAttribute('data-i'),10); save(); errFromEx(xn,xk); exRefresh(xn); } e.preventDefault(); return; }
     if(act==='exreset'){ var rn=a.getAttribute('data-n'), rk=a.getAttribute('data-key'); if(store.exAns) delete store.exAns[rk]; save(); exRefresh(rn); e.preventDefault(); return; }
     if(act==='exsess'){ var sk=parseInt(a.getAttribute('data-s'),10); store.exSess=sk; save(); var L=exChaptersForSession(sk), tg=L[0]; for(var q=0;q<L.length;q++){ if(exFirstOpen(L[q])<L[q].items.length){ tg=L[q]; break; } } if(tg) location.hash='#/ex/'+tg.n; e.preventDefault(); return; }
     if(act==='exchap'){ store.exSess=null; save(); location.hash='#/ex/'+a.getAttribute('data-ch'); e.preventDefault(); return; }
@@ -1825,6 +1981,12 @@ document.addEventListener('click', function(e){
     if(act==='ptfinish'){ ptCapture(); var un=ptb?ptb.item.mcq.filter(function(q,i){ return ptb.ans[i]===undefined; }).length:0; if(un&&!confirm('Il te reste '+un+' question'+(un>1?'s':'')+' sans reponse. Terminer quand meme ?')) return; ptFinish(); return; }
     if(act==='ptretry'){ if(ptb&&ptb.gen){ ptb={itemId:ptb.itemId,item:ptb.item,idx:0,phase:'run',ans:{},texts:{},t0:Date.now(),gen:ptb.gen,genC:ptb.genC}; render(); } else ptStart(ptb.itemId); return; }
     if(act==='ptwrong'){ ptRetryWrong(); return; }
+    if(act==='errstart'){ errStart(a.getAttribute('data-m')); return; }
+    if(act==='errreveal'){ errp.thought=(document.getElementById('errThought')||{}).value||''; errp.phase='choose'; render(); return; }
+    if(act==='errans'){ errAnswer(parseInt(a.getAttribute('data-i'),10)); return; }
+    if(act==='errnext'){ errp.idx++; errp.phase='think'; errp.sel=null; errp.thought=''; errp.twin=null; errp.twinSel=null; var nk=errp.queue[errp.idx]; if(errp.idx>=errp.queue.length){ var rq=errp.ko.filter(function(k){ return !errp.req[k]; }).slice(0,5); if(rq.length){ rq.forEach(function(k){ errp.req[k]=1; errp.queue.push(k); }); } } render(); return; }
+    if(act==='errtwin'){ var te=errs()[errp.queue[errp.idx]], tw=errTwin(te); if(tw){ errp.twin=tw; errp.twinSel=null; errp.phase='twin'; render(); } return; }
+    if(act==='errtwinans'){ var ti=parseInt(a.getAttribute('data-i'),10), tq=errp.twin.q, tok=ti===tq.correct_index; errp.twinSel=ti; addAttempt({course:errp.twin.cid,session:String(errp.twin.s),questionId:String(tq.id),topic:tq.topic||'',correct:tok,ts:Date.now(),source:'recall',secs:0,choice:ti}); if(!tok) errAdd(errFromBank(errp.twin.cid,tq,ti,Date.now(),errp.twin.s)); else errRight('b:'+errp.twin.cid+':'+tq.id); render(); return; }
     if(act==='ptgen'){ ptStartGen(a.getAttribute('data-k'),a.getAttribute('data-c')); return; }
     if(act==='excourse'){ store.exCourse=a.getAttribute('data-c'); save(); render(); return; }
     if(act==='dladd'){
@@ -1844,7 +2006,8 @@ document.addEventListener('keydown', function(e){
 
 /* levels.js (QCM par niveau) charge en asynchrone: on redessine quand il arrive */
 function levelsReady(){ return !!(D.QCM_LEVELS && Object.keys(D.QCM_LEVELS).length); }
-window.addEventListener('c40levels',function(){ try{ if(quiz && !quiz.bank.length) quiz=null; render(); }catch(e){} });
+window.addEventListener('c40levels',function(){ try{ if(quiz && !quiz.bank.length) quiz=null; errMigrate(); render(); }catch(e){} });
+if(levelsReady()) { try{ errMigrate(); }catch(e){} }
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator){
