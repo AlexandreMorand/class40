@@ -1,4 +1,4 @@
-const V='lot178-20261126';
+const V='lot179-20261127';
 const CACHE='c40-app-'+V;
 const CORE=['./','index.html','app.js?v='+V,'data.js?v='+V,'levels.js?v='+V,'manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-180.png','fiches/fm45-reader.html','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
 self.addEventListener('install',e=>{
